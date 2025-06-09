@@ -1,40 +1,46 @@
+// app/api/auth/signin/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createUser } from '@/lib/auth';
+import { signIn } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, firstName, lastName, phone } = await request.json();
+    const { email, password } = await request.json();
 
-    if (!email || !password || !firstName || !lastName) {
+    // Validate input
+    if (!email || !password) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Email and password are required' },
         { status: 400 }
       );
     }
 
-    const user = await createUser(email, password, {
-      fullName: `${firstName} ${lastName}`,
-      phone
-    });
+    // Attempt sign in
+    const result = await signIn(email, password);
 
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.full_name,
-        verified: user.verified
-      }
-    });
-  } catch (error: any) {
-    console.error('Signup error:', error);
-    
-    if (error.code === '23505') { // Unique constraint violation
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'Email already exists' },
-        { status: 409 }
+        { error: result.error },
+        { status: 401 }
       );
     }
 
+    // Create response with token in HTTP-only cookie
+    const response = NextResponse.json({
+      success: true,
+      user: result.user,
+    });
+
+    // Set HTTP-only cookie
+    response.cookies.set('auth-token', result.token!, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Sign in API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
