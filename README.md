@@ -1,8 +1,8 @@
-# Mavuso - Dating Through Experiences
+# MVP Dating App - Experience-Based Dating Platform
 
 A modern dating platform that connects people through unique shared experiences rather than traditional swiping.
 
-## Features
+## 🎯 Features
 
 - **Experience-Based Dating**: Users create and book unique dating experiences
 - **Real-time Chat**: Integrated messaging system for communication
@@ -11,80 +11,87 @@ A modern dating platform that connects people through unique shared experiences 
 - **Reviews & Ratings**: Community-driven quality assurance
 - **Mobile-First Design**: Responsive design optimized for all devices
 
-## Tech Stack
+## 🚀 Tech Stack
 
 - **Frontend**: Next.js 13, React, TypeScript, Tailwind CSS
-- **Backend**: Node.js API Routes, PostgreSQL (Neon DB)
+- **Backend**: Next.js API Routes, Node.js
 - **Database**: Neon DB (Serverless PostgreSQL)
-- **Authentication**: Custom JWT-based auth
+- **Authentication**: Custom JWT-based auth with HTTP-only cookies
 - **UI Components**: shadcn/ui, Radix UI
 - **Icons**: Lucide React
 - **Styling**: Tailwind CSS with custom design system
 
-## Getting Started
+## 📋 Prerequisites
 
-### Prerequisites
-
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 - Neon DB account
 
-### Installation
+## 🏁 Quick Start
 
-1. Clone the repository:
+### 1. Clone the repository
 ```bash
-git clone <repository-url>
-cd mavuso-dating-app
+git clone https://github.com/dumichanda/MVP.git
+cd MVP
 ```
 
-2. Install dependencies:
+### 2. Install dependencies
 ```bash
 npm install
 ```
 
-3. Set up environment variables:
+### 3. Set up environment variables
+Copy `.env.local.example` to `.env.local` and update the values:
+
 ```bash
 cp .env.local.example .env.local
 ```
 
-4. Configure your Neon DB:
-   - Create a new Neon project
-   - Copy your connection string to `.env.local`
-   - Run the database schema and seed scripts
+Required environment variables:
+```env
+DATABASE_URL="your-neon-db-connection-string"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-secret-key-minimum-32-characters"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+```
 
-5. Start the development server:
+### 4. Set up the database
+Run the schema and seed scripts in your Neon Console:
+
+1. Go to [Neon Console](https://console.neon.tech)
+2. Create a new project (if you haven't already)
+3. Copy your connection string to `.env.local`
+4. In the SQL Editor, run:
+   - `sql/schema.sql` to create all tables
+   - `sql/seed.sql` to add sample data (optional)
+
+### 5. Start the development server
 ```bash
 npm run dev
 ```
 
-## Database Setup
+Visit [http://localhost:3000](http://localhost:3000) to see your application.
 
-### Setting up Neon DB
+## 🔧 Deployment
 
-1. Go to [Neon Console](https://console.neon.tech)
-2. Create a new project
-3. Copy the connection string
-4. Update your `.env.local` file
+### Deploy to Vercel (Recommended)
 
-### Running Database Scripts
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard:
+   - `DATABASE_URL`
+   - `NEXTAUTH_URL` (your production domain)
+   - `NEXTAUTH_SECRET`
+   - `NEXT_PUBLIC_APP_URL` (your production domain)
+3. Deploy with automatic builds
 
-You can run the SQL scripts directly in the Neon Console SQL Editor:
+### Deploy to Other Platforms
 
-1. **Schema Setup**: Run `sql/schema.sql` to create all tables
-2. **Seed Data**: Run `sql/seed.sql` to add sample data
+The app is configured to work with any Node.js hosting platform. Just ensure you:
+1. Set up the required environment variables
+2. Run `npm run build` to create the production build
+3. Start with `npm start`
 
-### Environment Variables
-
-Create a `.env.local` file with the following variables:
-
-```env
-DATABASE_URL=postgresql://neondb_owner:npg_PfWQsNtGp7O0@ep-lively-math-a4foihwb-pooler.us-east-1.aws.neon.tech/MV_DC?sslmode=require
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-nextauth-secret-key-here
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-## Project Structure
+## 🗂️ Project Structure
 
 ```
 ├── app/                    # Next.js app directory
@@ -94,64 +101,49 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 │   │   ├── bookings/      # Booking management
 │   │   └── messages/      # Messaging endpoints
 │   ├── auth/              # Authentication pages
-│   ├── bookings/          # Booking management
+│   ├── bookings/          # Booking management pages
 │   ├── chats/             # Messaging interface
 │   ├── create/            # Experience creation
-│   ├── offers/            # Experience details
+│   ├── offers/            # Experience browsing
 │   └── profile/           # User profiles
 ├── components/            # Reusable UI components
 │   └── ui/               # shadcn/ui components
 ├── contexts/             # React contexts
 ├── hooks/                # Custom React hooks
 ├── lib/                  # Utility functions and API
-│   ├── api/              # Database API functions
-│   ├── auth.ts           # Authentication utilities
-│   └── db.ts             # Database connection
+│   ├── auth.ts          # Authentication utilities
+│   └── db.ts            # Database connection
 ├── sql/                  # Database scripts
-│   ├── schema.sql        # Database schema
-│   └── seed.sql          # Sample data
+│   ├── schema.sql       # Database schema
+│   └── seed.sql         # Sample data
 ├── types/                # TypeScript type definitions
 └── middleware.ts         # Next.js middleware for auth
 ```
 
-## Key Features Implementation
+## 🔐 Authentication
 
-### Authentication
-- Custom JWT-based authentication
-- Secure password hashing with bcrypt
+The app uses a custom JWT-based authentication system with:
+- Secure password hashing with bcryptjs
 - HTTP-only cookies for token storage
 - Protected API routes with middleware
+- Automatic token refresh
 
-### Database
-- PostgreSQL with Neon DB
-- Connection pooling for performance
-- Transaction support for data consistency
-- Optimized queries with proper indexing
+## 💾 Database
 
-### Experiences
-- Create, read, update, delete experiences
-- Image upload and management
-- Category filtering and search
-- Time slot management
+- **PostgreSQL** with Neon DB (serverless)
+- **Connection pooling** for performance
+- **Transaction support** for data consistency
+- **Optimized queries** with proper indexing
 
-### Bookings
-- Complete booking flow
-- Payment integration ready (Stripe)
-- Status management (pending, confirmed, completed, cancelled)
-- Host and guest perspectives
+## 🎨 UI Components
 
-### Messaging
-- Real-time chat capability
-- Conversation management
-- Message history and persistence
-- Unread message tracking
+Built with modern, accessible components:
+- **shadcn/ui** for base components
+- **Radix UI** for advanced interactions
+- **Tailwind CSS** for styling
+- **Lucide React** for icons
 
-### Reviews & Ratings
-- Post-experience review system
-- Rating aggregation
-- Host reputation tracking
-
-## API Endpoints
+## 📱 API Endpoints
 
 ### Authentication
 - `POST /api/auth/signin` - User sign in
@@ -173,55 +165,21 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - `GET /api/messages/[id]` - Get conversation messages
 - `POST /api/messages` - Send message
 
-## Deployment
-
-### Database Setup
-1. Create a Neon DB project
-2. Run schema and seed scripts
-3. Configure connection string
-
-### Vercel Deployment
-1. Connect your GitHub repository to Vercel
-2. Configure environment variables
-3. Deploy with automatic builds
-
-### Environment Configuration
-- Set up production environment variables
-- Configure custom domain
-- Set up analytics and monitoring
-
-## Sample Users
+## 🧪 Test Users
 
 The seed data includes these test users:
+- Email: nomsa@example.com, Password: password123
+- Email: michael@example.com, Password: password123
+- Email: sarah@example.com, Password: password123
 
-- **Email**: nomsa@example.com, **Password**: password123
-- **Email**: michael@example.com, **Password**: password123  
-- **Email**: sarah@example.com, **Password**: password123
+## 🚧 Known Issues Fixed
 
-## Contributing
+✅ **Cloudflare:sockets webpack error** - Fixed with proper webpack configuration
+✅ **Database connection issues** - Resolved by using @neondatabase/serverless exclusively
+✅ **Authentication token handling** - Implemented secure HTTP-only cookies
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+## 🔮 Future Features
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support and questions:
-- Create an issue on GitHub
-- Contact the development team
-- Check the documentation
-
-## Roadmap
-
-- [x] Database migration to Neon DB
-- [x] Custom authentication system
-- [x] Core API endpoints
 - [ ] Payment integration (Stripe)
 - [ ] Real-time messaging with WebSockets
 - [ ] Push notifications
@@ -230,28 +188,25 @@ For support and questions:
 - [ ] Mobile app (React Native)
 - [ ] AI-powered experience recommendations
 
-## Database Schema
+## 📄 License
 
-### Users Table
-- User authentication and profile information
-- Interests, location, verification status
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-### Experiences Table
-- Experience listings with details, pricing, images
-- Host information and categorization
+## 🤝 Contributing
 
-### Time Slots Table
-- Available booking times for experiences
-- Availability tracking
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-### Bookings Table
-- Booking records with status tracking
-- Payment status and guest information
+## 📞 Support
 
-### Conversations & Messages Tables
-- Chat functionality between users
-- Message history and read status
+For support and questions:
+- Create an issue on GitHub
+- Check the documentation
+- Contact: [your-email@example.com]
 
-### Reviews Table
-- Experience reviews and ratings
-- Host reputation system
+---
+
+Built with ❤️ using Next.js, TypeScript, and Neon DB
