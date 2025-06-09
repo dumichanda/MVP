@@ -5,11 +5,18 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: { unoptimized: true },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       'cloudflare:sockets': false,
     };
+    
+    // Add externals configuration for client-side builds
+    if (!isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('cloudflare:sockets');
+    }
+    
     return config;
   },
 };
