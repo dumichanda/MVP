@@ -7,11 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function AuthPage() {
+  const { signIn, signUp } = useAuthContext();
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -30,25 +35,43 @@ export default function AuthPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log('Login attempt:', loginData);
+    try {
+      await signIn(loginData.email, loginData.password);
+      router.push('/');
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+    } finally {
       setIsLoading(false);
-      // Redirect to home or dashboard
-    }, 1500);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log('Signup attempt:', signupData);
+    if (signupData.password !== signupData.confirmPassword) {
+      setError('Passwords do not match');
       setIsLoading(false);
-      // Redirect to home or dashboard
-    }, 1500);
+      return;
+    }
+    
+    try {
+      await signUp(
+        signupData.email, 
+        signupData.password, 
+        signupData.firstName, 
+        signupData.lastName, 
+        signupData.phone
+      );
+      router.push('/');
+    } catch (err: any) {
+      setError(err.message || 'Signup failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -72,6 +95,13 @@ export default function AuthPage() {
             <h1 className="text-4xl font-bold text-white mb-2">Mavuso</h1>
             <p className="text-gray-400">Discover unique dating experiences</p>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-900/20 border border-red-700 rounded-lg">
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          )}
 
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-gray-800 border border-gray-600">
@@ -160,6 +190,13 @@ export default function AuthPage() {
                       {isLoading ? 'Signing in...' : 'Sign In'}
                     </Button>
                   </form>
+
+                  {/* Demo Credentials */}
+                  <div className="mt-4 p-3 bg-blue-900/20 border border-blue-700 rounded-lg">
+                    <p className="text-blue-400 text-sm font-medium mb-2">Demo Credentials:</p>
+                    <p className="text-blue-300 text-xs">Email: nomsa@example.com</p>
+                    <p className="text-blue-300 text-xs">Password: password123</p>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -230,7 +267,6 @@ export default function AuthPage() {
                           value={signupData.phone}
                           onChange={(e) => setSignupData(prev => ({ ...prev, phone: e.target.value }))}
                           className="pl-10 bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-red-500"
-                          required
                         />
                       </div>
                     </div>
