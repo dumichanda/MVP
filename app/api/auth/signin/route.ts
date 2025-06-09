@@ -1,10 +1,12 @@
+// app/api/auth/signin/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateUser, generateToken } from '@/lib/auth';
+import { signIn } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
 
+    // Validate input
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -12,40 +14,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await authenticateUser(email, password);
+    // Attempt sign in
+    const result = await signIn(email, password);
 
-    if (!user) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        { error: result.error },
         { status: 401 }
       );
     }
 
-    const token = generateToken(user.id);
-
+    // Create response with token in HTTP-only cookie
     const response = NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.full_name,
-        verified: user.verified,
-        avatar: user.avatar_url,
-        location: user.location,
-        bio: user.bio
-      }
+      success: true,
+      user: result.user,
     });
 
     // Set HTTP-only cookie
-    response.cookies.set('auth-token', token, {
+    response.cookies.set('auth-token', result.token!, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
+      maxAge: 60 * 60 * 24 * 7, // 7 days
     });
 
     return response;
   } catch (error) {
-    console.error('Signin error:', error);
+    console.error('Sign in API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
