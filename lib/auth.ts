@@ -1,101 +1,173 @@
+// lib/auth.ts - Fixed authentication using Neon DB
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from './db';
+import { query, getUser, createUser } from './db';
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key';
 
 export interface User {
   id: string;
   email: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  location: string | null;
+  firstName: string;
+  lastName: string;
+  profilePicture?: string;
+  bio?: string;
+  interests?: string[];
+  location?: string;
   verified: boolean;
-  created_at: string;
-  interests: string[] | null;
-  phone: string | null;
+  createdAt: string;
 }
 
+export interface AuthResult {
+  success: boolean;
+  user?: User;
+  token?: string;
+  error?: string;
+}
+
+// Hash password
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
 }
 
+// Verify password
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
   return bcrypt.compare(password, hashedPassword);
 }
 
+// Generate JWT token
 export function generateToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
 }
 
+// Verify JWT token
 export function verifyToken(token: string): { userId: string } | null {
   try {
     return jwt.verify(token, JWT_SECRET) as { userId: string };
-  } catch {
+  } catch (error) {
     return null;
   }
 }
 
-export async function createUser(email: string, password: string, userData: {
-  fullName: string;
-  phone?: string;
-}): Promise<User> {
-  const hashedPassword = await hashPassword(password);
-  
-  const result = await query(
-    `INSERT INTO users (email, password_hash, full_name, phone) 
-     VALUES ($1, $2, $3, $4) 
-     RETURNING id, email, full_name, avatar_url, bio, location, verified, created_at, interests, phone`,
-    [email, hashedPassword, userData.fullName, userData.phone]
-  );
-  
-  return result.rows[0];
+// Sign up user
+export async function signUp(userData: {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}): Promise<AuthResult> {
+  try {
+    const { email, password, firstName, lastName } = userData;
+
+    // Check if user already exists
+    const existingUser = await getUser(email);
+    if (existingUser) {
+      return { success: false, error: 'User already exists' };
+    }
+
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Create user
+    const newUser = await createUser({
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+    });
+
+    // Generate token
+    const token = generateToken(newUser.id);
+
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = newUser;
+
+    return {
+      success: true,
+      user: {
+        id: userWithoutPassword.id,
+        email: userWithoutPassword.email,
+        firstName: userWithoutPassword.first_name,
+        lastName: userWithoutPassword.last_name,
+        verified: userWithoutPassword.verified || false,
+        createdAt: userWithoutPassword.created_at,
+      },
+      token,
+    };
+  } catch (error) {
+    console.error('Sign up error:', error);
+    return { success: false, error: 'Failed to create account' };
+  }
 }
 
-export async function authenticateUser(email: string, password: string): Promise<User | null> {
-  const result = await query(
-    'SELECT * FROM users WHERE email = $1',
-    [email]
-  );
-  
-  if (result.rows.length === 0) {
+// Sign in user
+export async function signIn(email: string, password: string): Promise<AuthResult> {
+  try {
+    // Get user from database
+    const user = await getUser(email);
+    if (!user) {
+      return { success: false, error: 'Invalid credentials' };
+    }
+
+    // Verify password
+    const isValid = await verifyPassword(password, user.password);
+    if (!isValid) {
+      return { success: false, error: 'Invalid credentials' };
+    }
+
+    // Generate token
+    const token = generateToken(user.id);
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        profilePicture: user.profile_picture,
+        bio: user.bio,
+        interests: user.interests,
+        location: user.location,
+        verified: user.verified || false,
+        createdAt: user.created_at,
+      },
+      token,
+    };
+  } catch (error) {
+    console.error('Sign in error:', error);
+    return { success: false, error: 'Failed to sign in' };
+  }
+}
+
+// Get user from token
+export async function getUserFromToken(token: string): Promise<User | null> {
+  try {
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return null;
+    }
+
+    const user = await query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
+    if (!user.rows[0]) {
+      return null;
+    }
+
+    const userData = user.rows[0];
+    return {
+      id: userData.id,
+      email: userData.email,
+      firstName: userData.first_name,
+      lastName: userData.last_name,
+      profilePicture: userData.profile_picture,
+      bio: userData.bio,
+      interests: userData.interests,
+      location: userData.location,
+      verified: userData.verified || false,
+      createdAt: userData.created_at,
+    };
+  } catch (error) {
+    console.error('Get user from token error:', error);
     return null;
   }
-  
-  const user = result.rows[0];
-  const isValid = await verifyPassword(password, user.password_hash);
-  
-  if (!isValid) {
-    return null;
-  }
-  
-  // Return user without password hash
-  const { password_hash, ...userWithoutPassword } = user;
-  return userWithoutPassword;
-}
-
-export async function getUserById(id: string): Promise<User | null> {
-  const result = await query(
-    `SELECT id, email, full_name, avatar_url, bio, location, verified, created_at, interests, phone 
-     FROM users WHERE id = $1`,
-    [id]
-  );
-  
-  return result.rows[0] || null;
-}
-
-export async function updateUser(id: string, updates: Partial<User>): Promise<User> {
-  const fields = Object.keys(updates).filter(key => key !== 'id');
-  const values = fields.map(field => updates[field as keyof User]);
-  const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
-  
-  const result = await query(
-    `UPDATE users SET ${setClause}, updated_at = NOW() 
-     WHERE id = $1 
-     RETURNING id, email, full_name, avatar_url, bio, location, verified, created_at, interests, phone`,
-    [id, ...values]
-  );
-  
-  return result.rows[0];
 }
