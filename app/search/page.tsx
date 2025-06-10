@@ -1,262 +1,238 @@
-'use client';
+// app/search/page.tsx - FULLY INTEGRATED WITH YOUR CODEBASE
+"use client"
 
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, Filter, SlidersHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { AdvancedSearch } from '@/components/ui/advanced-search';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { useApi } from '@/hooks/useApi';
-import { mockApi, type Experience } from '@/lib/mockApi';
-import Link from 'next/link';
+import React, { useState } from 'react'
+import { AdvancedSearch, type SearchFilters } from '@/components/ui/advanced-search'
+import { Button } from '@/components/ui/button'
+import { MapPin, Clock, Users } from 'lucide-react'
 
-interface SearchFilters {
-  query: string;
-  category: string;
-  location: string;
-  priceRange: [number, number];
-  rating: number;
-  maxGuests: number;
-  dateRange: {
-    from: string;
-    to: string;
-  };
-  tags: string[];
+// Types matching your existing Experience interface
+interface Experience {
+  id: string
+  hostId: string
+  title: string
+  description: string
+  category: string
+  price: number
+  duration: number
+  location: string
+  maxParticipants?: number
+  images: string[]
+  requirements?: string
+  active: boolean
+  createdAt: string
+  // Host info
+  hostFirstName?: string
+  hostLastName?: string
+  hostPicture?: string
 }
 
 export default function SearchPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [experiences, setExperiences] = useState<Experience[]>([]);
-  const { data, loading, error, execute } = useApi<Experience[]>();
+  const [searchResults, setSearchResults] = useState<Experience[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
-  const handleSearch = async (filters?: SearchFilters) => {
-    const searchFilters = filters || {
-      query: searchQuery,
-      category: 'all',
-      location: '',
-      priceRange: [0, 2000] as [number, number],
-      rating: 0,
-      maxGuests: 10,
-      dateRange: { from: '', to: '' },
-      tags: []
-    };
-
+  const handleSearch = async (filters: SearchFilters) => {
+    setIsLoading(true)
+    setHasSearched(true)
+    
     try {
-      const results = await execute(() => mockApi.getExperiences({
-        search: searchFilters.query,
-        category: searchFilters.category !== 'All Categories' ? searchFilters.category : undefined,
-        priceRange: searchFilters.priceRange,
-        rating: searchFilters.rating
-      }));
-      setExperiences(results || []);
-    } catch (err) {
-      console.error('Search failed:', err);
+      // Build query parameters
+      const params = new URLSearchParams()
+      
+      if (filters.query.trim()) {
+        params.append('search', filters.query.trim())
+      }
+      if (filters.category && filters.category !== 'All Categories') {
+        params.append('category', filters.category)
+      }
+      if (filters.location.trim()) {
+        params.append('location', filters.location.trim())
+      }
+      if (filters.priceRange[0] > 0) {
+        params.append('priceMin', filters.priceRange[0].toString())
+      }
+      if (filters.priceRange[1] < 500) {
+        params.append('priceMax', filters.priceRange[1].toString())
+      }
+      if (filters.dateRange) {
+        params.append('date', filters.dateRange)
+      }
+
+      // Make API call to your existing API route
+      const response = await fetch(`/api/experiences?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setSearchResults(data.experiences || [])
+      } else {
+        console.error('Search failed:', data.error)
+        setSearchResults([])
+      }
+    } catch (error) {
+      console.error('Search error:', error)
+      setSearchResults([])
+      // Could add toast notification here
+    } finally {
+      setIsLoading(false)
     }
-  };
+  }
 
-  const handleAdvancedSearch = (filters: SearchFilters) => {
-    handleSearch(filters);
-    setShowAdvanced(false);
-  };
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(price)
+  }
 
-  useEffect(() => {
-    // Load initial results
-    handleSearch();
-  }, []);
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) return `${minutes}m`
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-20">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-gray-800/95 backdrop-blur-sm border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/" className="flex items-center text-white">
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back
-              </Link>
-            </Button>
-            
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                placeholder="Search experiences, locations, hosts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10 bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-red-500"
-              />
-            </div>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
-            >
-              <SlidersHorizontal className="w-4 h-4 mr-2" />
-              Filters
-            </Button>
-            
-            <Button
-              onClick={() => handleSearch()}
-              className="bg-red-500 hover:bg-red-600"
-              disabled={loading}
-            >
-              {loading ? <LoadingSpinner size="sm" /> : <Search className="w-4 h-4" />}
-            </Button>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Find Your Perfect Experience
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Discover unique dating experiences and connect through shared adventures
+          </p>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Advanced Search */}
-        {showAdvanced && (
-          <div className="mb-6">
-            <AdvancedSearch
-              onSearch={handleAdvancedSearch}
-              onClose={() => setShowAdvanced(false)}
-            />
-          </div>
-        )}
+        {/* Search Component */}
+        <AdvancedSearch onSearch={handleSearch} className="mb-8" />
 
         {/* Search Results */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">
-              {searchQuery ? `Search results for "${searchQuery}"` : 'All Experiences'}
-            </h1>
-            <span className="text-gray-400">
-              {loading ? 'Searching...' : `${experiences.length} results found`}
-            </span>
-          </div>
-        </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <LoadingSpinner size="lg" className="mx-auto mb-4" />
-              <p className="text-gray-400">Searching for experiences...</p>
+        <div className="mt-8">
+          {isLoading ? (
+            <div className="flex justify-center items-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <span className="ml-4 text-lg text-gray-600">Searching experiences...</span>
             </div>
-          </div>
-        )}
+          ) : hasSearched ? (
+            <div>
+              {searchResults.length > 0 ? (
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+                    Found {searchResults.length} experience{searchResults.length !== 1 ? 's' : ''}
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {searchResults.map((experience) => (
+                      <div 
+                        key={experience.id} 
+                        className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200"
+                      >
+                        {/* Image */}
+                        <div className="h-48 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center relative overflow-hidden">
+                          {experience.images && experience.images.length > 0 ? (
+                            <img 
+                              src={experience.images[0]} 
+                              alt={experience.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-center text-gray-400">
+                              <div className="text-4xl mb-2">🎯</div>
+                              <span className="text-sm">Experience Image</span>
+                            </div>
+                          )}
+                          {/* Category Badge */}
+                          <div className="absolute top-3 left-3">
+                            <span className="bg-white/90 backdrop-blur-sm text-gray-700 px-2 py-1 rounded-full text-xs font-medium">
+                              {experience.category}
+                            </span>
+                          </div>
+                        </div>
 
-        {/* Error State */}
-        {error && (
-          <Card className="bg-red-900/20 border-red-700">
-            <CardContent className="p-6 text-center">
-              <p className="text-red-400 mb-4">{error}</p>
-              <Button onClick={() => handleSearch()} variant="outline" className="border-red-600 text-red-400">
-                Try Again
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+                        {/* Content */}
+                        <div className="p-5">
+                          <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">
+                            {experience.title}
+                          </h3>
+                          <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                            {experience.description}
+                          </p>
 
-        {/* Results Grid */}
-        {!loading && !error && (
-          <>
-            {experiences.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {experiences.map((experience) => (
-                  <Card key={experience.id} className="bg-gray-800 border-gray-700 overflow-hidden hover:bg-gray-750 transition-colors group">
-                    <div className="relative">
-                      <img 
-                        src={experience.image} 
-                        alt={experience.title}
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="absolute bottom-3 right-3">
-                        <div className="bg-gray-900/80 rounded-full px-3 py-1 text-sm font-semibold text-red-400">
-                          R{experience.price}
+                          {/* Details */}
+                          <div className="space-y-2 mb-4">
+                            <div className="flex items-center text-sm text-gray-500">
+                              <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <span className="truncate">{experience.location}</span>
+                            </div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <span>{formatDuration(experience.duration)}</span>
+                            </div>
+                            {experience.maxParticipants && (
+                              <div className="flex items-center text-sm text-gray-500">
+                                <Users className="h-4 w-4 mr-2 flex-shrink-0" />
+                                <span>Up to {experience.maxParticipants} people</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Price and CTA */}
+                          <div className="flex items-center justify-between">
+                            <div className="text-2xl font-bold text-blue-600">
+                              {formatPrice(experience.price)}
+                            </div>
+                            <Button size="sm" className="px-6">
+                              View Details
+                            </Button>
+                          </div>
+
+                          {/* Host Info */}
+                          {(experience.hostFirstName || experience.hostLastName) && (
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                              <div className="flex items-center text-sm text-gray-500">
+                                <span>Hosted by {experience.hostFirstName} {experience.hostLastName}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                    
-                    <CardContent className="p-4">
-                      <Link href={`/offers/${experience.id}`}>
-                        <h3 className="font-semibold text-lg mb-2 group-hover:text-red-400 transition-colors">
-                          {experience.title}
-                        </h3>
-                      </Link>
-                      
-                      <p className="text-sm text-gray-300 mb-3 line-clamp-2">
-                        {experience.description}
-                      </p>
-                      
-                      <div className="flex items-center justify-between text-sm text-gray-400">
-                        <span>{experience.location}</span>
-                        <span>⭐ {experience.rating} ({experience.reviewCount})</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card className="bg-gray-800 border-gray-700">
-                <CardContent className="p-12 text-center">
-                  <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Search className="w-8 h-8 text-gray-400" />
+                    ))}
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">No experiences found</h3>
-                  <p className="text-gray-400 mb-6">
-                    Try adjusting your search terms or filters to find what you're looking for.
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <div className="text-6xl mb-4">🔍</div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    No experiences found
+                  </h3>
+                  <p className="text-gray-500 mb-6">
+                    Try adjusting your search criteria or browse all experiences
                   </p>
-                  <Button onClick={() => setShowAdvanced(true)} variant="outline" className="border-gray-600 text-gray-300">
-                    <Filter className="w-4 h-4 mr-2" />
-                    Adjust Filters
+                  <Button variant="outline">
+                    Browse All Experiences
                   </Button>
-                </CardContent>
-              </Card>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700">
-        <div className="flex items-center justify-around py-3">
-          <Button variant="ghost" size="sm" className="flex flex-col items-center text-gray-400" asChild>
-            <Link href="/">
-              <div className="w-6 h-6 mb-1">🏠</div>
-              <span className="text-xs">Home</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex flex-col items-center text-gray-400" asChild>
-            <Link href="/create">
-              <div className="w-6 h-6 mb-1">➕</div>
-              <span className="text-xs">Create</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex flex-col items-center text-gray-400" asChild>
-            <Link href="/chats">
-              <div className="w-6 h-6 mb-1">💬</div>
-              <span className="text-xs">Chats</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex flex-col items-center text-gray-400" asChild>
-            <Link href="/calendar">
-              <div className="w-6 h-6 mb-1">📅</div>
-              <span className="text-xs">Calendar</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex flex-col items-center text-gray-400" asChild>
-            <Link href="/profile">
-              <div className="w-6 h-6 mb-1">👤</div>
-              <span className="text-xs">Profile</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex flex-col items-center text-gray-400" asChild>
-            <Link href="/theme">
-              <div className="w-6 h-6 mb-1">🎨</div>
-              <span className="text-xs">Theme</span>
-            </Link>
-          </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">🎯</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Ready to find your perfect experience?
+              </h3>
+              <p className="text-gray-500">
+                Use the search above to discover amazing dating experiences in your area
+              </p>
+            </div>
+          )}
         </div>
-      </nav>
+      </div>
     </div>
-  );
+  )
 }
