@@ -1,48 +1,27 @@
+// app/api/auth/signout/route.ts'
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, getUserById } from '@/lib/auth';
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get('auth-token')?.value;
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No token provided' },
-        { status: 401 }
-      );
-    }
-
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-
-    const user = await getUserById(payload.userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.full_name,
-        verified: user.verified,
-        avatar: user.avatar_url,
-        location: user.location,
-        bio: user.bio
-      }
+    // Create response
+    const response = NextResponse.json({
+      success: true,
+      message: 'Signed out successfully',
     });
+
+    // Clear the auth token cookie
+    response.cookies.set('auth-token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0, // Expire immediately
+    });
+
+    return response;
   } catch (error) {
-    console.error('Auth check error:', error);
+    console.error('Sign out API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
