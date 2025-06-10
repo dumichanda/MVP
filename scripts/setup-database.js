@@ -370,4 +370,50 @@ async function setupDatabase() {
     await client.query(SCHEMA_SQL)
     console.log('✅ Schema created successfully!')
     
-    // Execute see
+    // Execute seed data
+    console.log('🌱 Inserting seed data...')
+    await client.query(SEED_SQL)
+    console.log('✅ Seed data inserted successfully!')
+    
+    // Verify setup
+    console.log('🔍 Verifying database setup...')
+    const userCount = await client.query('SELECT COUNT(*) FROM users')
+    const experienceCount = await client.query('SELECT COUNT(*) FROM experiences')
+    const bookingCount = await client.query('SELECT COUNT(*) FROM bookings')
+    const interestCount = await client.query('SELECT COUNT(*) FROM interests')
+    
+    console.log('📊 Database Statistics:')
+    console.log(`   Users: ${userCount.rows[0].count}`)
+    console.log(`   Experiences: ${experienceCount.rows[0].count}`)
+    console.log(`   Bookings: ${bookingCount.rows[0].count}`)
+    console.log(`   Interests: ${interestCount.rows[0].count}`)
+    
+    console.log('🎉 Database setup completed successfully!')
+    
+  } catch (error) {
+    console.error('❌ Database setup failed:', error.message)
+    throw error
+  } finally {
+    await client.end()
+  }
+}
+
+// Run setup if called directly
+if (require.main === module) {
+  setupDatabase()
+    .then(() => {
+      console.log('✨ All done! Your database is ready to use.')
+      console.log('💡 Test users (password: password123):')
+      console.log('   - thabo.mthembu@gmail.com (Cape Town)')
+      console.log('   - naledi.williams@outlook.com (Cape Town)')
+      console.log('   - sipho.maharaj@gmail.com (Johannesburg)')
+      console.log('   - nomsa.dlamini@gmail.com (Soweto)')
+      process.exit(0)
+    })
+    .catch((error) => {
+      console.error('💥 Setup failed:', error.message)
+      process.exit(1)
+    })
+}
+
+module.exports = { setupDatabase }
