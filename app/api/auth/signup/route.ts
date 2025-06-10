@@ -1,26 +1,48 @@
-// app/api/auth/signin/route.ts
+// app/api/auth/signup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { signIn } from '@/lib/auth';
+import { signUp } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, firstName, lastName } = await request.json();
 
     // Validate input
-    if (!email || !password) {
+    if (!email || !password || !firstName || !lastName) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'All fields are required' },
         { status: 400 }
       );
     }
 
-    // Attempt sign in
-    const result = await signIn(email, password);
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      );
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters long' },
+        { status: 400 }
+      );
+    }
+
+    // Attempt sign up
+    const result = await signUp({
+      email,
+      password,
+      firstName,
+      lastName,
+    });
 
     if (!result.success) {
       return NextResponse.json(
         { error: result.error },
-        { status: 401 }
+        { status: 400 }
       );
     }
 
@@ -40,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('Sign in API error:', error);
+    console.error('Sign up API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
