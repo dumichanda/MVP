@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const location = searchParams.get('location');
     const priceMin = searchParams.get('priceMin');
     const priceMax = searchParams.get('priceMax');
+    const search = searchParams.get('search');
 
     let queryText = `
       SELECT e.*, u.first_name, u.last_name, u.profile_picture as host_picture
@@ -19,6 +20,12 @@ export async function GET(request: NextRequest) {
     `;
     const queryParams: any[] = [];
     let paramCount = 0;
+
+    if (search) {
+      paramCount++;
+      queryText += ` AND (e.title ILIKE $${paramCount} OR e.description ILIKE $${paramCount})`;
+      queryParams.push(`%${search}%`);
+    }
 
     if (category) {
       paramCount++;
