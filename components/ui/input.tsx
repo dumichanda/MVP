@@ -1,6 +1,10 @@
-// components/ui/input.tsx
+// components/ui/input.tsx - Minimal input component
 import * as React from "react"
-import { cn } from "@/lib/utils"
+
+// Simple utility function
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ')
+}
 
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {}
