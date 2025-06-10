@@ -45,20 +45,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@neondatabase/serverless'],
   },
-  
-  // Environment variables
-  env: {
-    DATABASE_URL: process.env.DATABASE_URL,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-  },
-  
-  // Image configuration for user uploads
-  images: {
-    domains: ['localhost', 'your-domain.com'],
-    unoptimized: process.env.NODE_ENV === 'development',
-  },
 }
 
 module.exports = nextConfig
