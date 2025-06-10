@@ -1,4 +1,6 @@
 // app/api/auth/signup/route.ts
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { signUp } from '@/lib/auth';
 
