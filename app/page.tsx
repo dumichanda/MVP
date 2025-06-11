@@ -9,12 +9,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useApp } from '@/contexts/AppContext';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { useApi } from '@/hooks/useApi';
 import { mockApi, type Experience } from '@/lib/mockApi';
+import { logger } from '@/lib/logger';
 import Link from 'next/link';
 
 export default function Home() {
   const { state, dispatch } = useApp();
+  const { user, isAuthenticated, loading: authLoading } = useAuthContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [experiences, setExperiences] = useState<Experience[]>([]);
@@ -28,21 +31,27 @@ export default function Home() {
 
   const loadExperiences = async () => {
     try {
+      logger.debug('Loading experiences', { category: selectedCategory, search: searchQuery }, 'HomePage');
+      
       const results = await execute(() => mockApi.getExperiences({
         category: selectedCategory === 'all' ? undefined : selectedCategory,
         search: searchQuery
       }));
       setExperiences(results || []);
+      
+      logger.info(`Loaded ${results?.length || 0} experiences`, 'HomePage');
     } catch (err) {
-      console.error('Failed to load experiences:', err);
+      logger.error(err instanceof Error ? err : new Error('Failed to load experiences'), 'HomePage');
     }
   };
 
   const handleSearch = () => {
+    logger.debug('Search triggered', { query: searchQuery }, 'HomePage');
     loadExperiences();
   };
 
   const toggleFavorite = (experienceId: string) => {
+    logger.debug('Toggling favorite', { experienceId }, 'HomePage');
     dispatch({ type: 'TOGGLE_FAVORITE', payload: experienceId });
   };
 
@@ -51,6 +60,18 @@ export default function Home() {
                          exp.location.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
+
+  // Show loading spinner while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="lg" className="mx-auto mb-4" />
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -63,13 +84,13 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-4">
-              {state.isAuthenticated ? (
+              {isAuthenticated && user ? (
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-300">Welcome, {state.user?.name}</span>
+                  <span className="text-sm text-gray-300">Welcome, {user.name || user.email}</span>
                   <Avatar className="w-8 h-8">
-                    <AvatarImage src={state.user?.avatar} />
+                    <AvatarImage src={user.avatar} />
                     <AvatarFallback className="bg-gray-600">
-                      {state.user?.name?.split(' ').map(n => n[0]).join('')}
+                      {user.name?.split(' ').map(n => n[0]).join('') || user.email[0].toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 </div>
@@ -80,7 +101,7 @@ export default function Home() {
                     className="bg-red-500 hover:bg-red-600 text-white px-6"
                     asChild
                   >
-                    <Link href="/auth">Sign In</Link>
+                    <Link href="/auth/signin">Sign In</Link>
                   </Button>
                 </>
               )}
@@ -139,7 +160,7 @@ export default function Home() {
         </div>
 
         {/* Quick Actions */}
-        {state.isAuthenticated && (
+        {isAuthenticated && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <Button variant="outline" className="border-gray-600 text-gray-300 h-16" asChild>
               <Link href="/create">
@@ -168,11 +189,29 @@ export default function Home() {
             <Button variant="outline" className="border-gray-600 text-gray-300 h-16" asChild>
               <Link href="/profile">
                 <div className="text-center">
-                  <div className="w-6 h-6 mx-auto mb-1">👤</div>
+                  <div className="w-6 h-6 mb-1">👤</div>
                   <span className="text-sm">Profile</span>
                 </div>
               </Link>
             </Button>
+          </div>
+        )}
+
+        {/* Guest Call to Action */}
+        {!isAuthenticated && (
+          <div className="mb-8 p-6 bg-gradient-to-r from-red-900/20 to-purple-900/20 border border-red-700/30 rounded-lg">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-2">Ready to Start Dating Through Experiences?</h2>
+              <p className="text-gray-300 mb-4">Join Mavuso to create and book unique dating experiences in South Africa</p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button className="bg-red-500 hover:bg-red-600 text-white px-8" asChild>
+                  <Link href="/auth/signin">Sign In</Link>
+                </Button>
+                <Button variant="outline" className="border-red-500 text-red-400 hover:bg-red-500 hover:text-white px-8" asChild>
+                  <Link href="/auth/signup">Create Account</Link>
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -234,17 +273,19 @@ export default function Home() {
                         R{experience.price}
                       </div>
                     </div>
-                    <button
-                      onClick={() => toggleFavorite(experience.id)}
-                      className="absolute bottom-3 left-3 p-2 bg-gray-900/80 rounded-full hover:bg-gray-900 transition-colors"
-                      aria-label={state.favorites.includes(experience.id) ? 'Remove from favorites' : 'Add to favorites'}
-                    >
-                      {state.favorites.includes(experience.id) ? (
-                        <Heart className="w-5 h-5 fill-red-500 text-red-500" />
-                      ) : (
-                        <Heart className="w-5 h-5 text-white" />
-                      )}
-                    </button>
+                    {isAuthenticated && (
+                      <button
+                        onClick={() => toggleFavorite(experience.id)}
+                        className="absolute bottom-3 left-3 p-2 bg-gray-900/80 rounded-full hover:bg-gray-900 transition-colors"
+                        aria-label={state.favorites.includes(experience.id) ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        {state.favorites.includes(experience.id) ? (
+                          <Heart className="w-5 h-5 fill-red-500 text-red-500" />
+                        ) : (
+                          <Heart className="w-5 h-5 text-white" />
+                        )}
+                      </button>
+                    )}
                   </div>
                   
                   <CardContent className="p-4">

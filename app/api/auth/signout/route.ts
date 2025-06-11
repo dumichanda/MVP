@@ -1,10 +1,10 @@
-// app/api/auth/signout/route.ts'
-export const runtime = 'nodejs';
-
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
+    logger.info('Sign out request received', 'API:auth/signout');
+    
     // Create response
     const response = NextResponse.json({
       success: true,
@@ -17,11 +17,13 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 0, // Expire immediately
+      path: '/', // Ensure cookie is cleared site-wide
     });
 
+    logger.info('Sign out successful', 'API:auth/signout');
     return response;
   } catch (error) {
-    console.error('Sign out API error:', error);
+    logger.error(error instanceof Error ? error : new Error(String(error)), 'API:auth/signout');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

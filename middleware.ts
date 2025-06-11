@@ -1,4 +1,4 @@
-// middleware.ts - Fixed middleware with proper redirect handling
+// middleware.ts - Fixed middleware with better logging and redirect handling
 import { NextRequest, NextResponse } from 'next/server';
 
 // Simple token verification without database dependency
@@ -30,8 +30,17 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth-token')?.value;
 
-  // Simple console logging instead of complex logger
-  console.log(`[Middleware] Request to ${pathname} - Token: ${!!token}`);
+  // Skip middleware for API routes, static files, and Next.js internals
+  if (
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/favicon.ico') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+
+  console.log(`[Middleware] ${pathname} - Token: ${!!token}`);
 
   // Check if the current path is protected
   const isProtectedRoute = protectedRoutes.some(route => 
@@ -46,7 +55,7 @@ export function middleware(request: NextRequest) {
   // Handle protected routes
   if (isProtectedRoute) {
     if (!token) {
-      console.log(`[Middleware] Redirecting to auth - no token for protected route: ${pathname}`);
+      console.log(`[Middleware] Redirecting to auth - no token: ${pathname}`);
       const authUrl = new URL('/auth/signin', request.url);
       authUrl.searchParams.set('from', pathname);
       return NextResponse.redirect(authUrl);
@@ -55,7 +64,7 @@ export function middleware(request: NextRequest) {
     // Verify token (simple verification without database)
     const decoded = verifyTokenSimple(token);
     if (!decoded) {
-      console.log(`[Middleware] Redirecting to auth - invalid token for protected route: ${pathname}`);
+      console.log(`[Middleware] Redirecting to auth - invalid token: ${pathname}`);
       const authUrl = new URL('/auth/signin', request.url);
       authUrl.searchParams.set('from', pathname);
       const response = NextResponse.redirect(authUrl);
@@ -66,19 +75,20 @@ export function middleware(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 0,
+        path: '/',
       });
       
       return response;
     }
 
-    console.log(`[Middleware] Access granted to protected route: ${pathname}`);
+    console.log(`[Middleware] Access granted: ${pathname}`);
   }
 
   // Handle auth routes (redirect if already authenticated)
   if (isAuthRoute && token) {
     const decoded = verifyTokenSimple(token);
     if (decoded) {
-      console.log(`[Middleware] Redirecting authenticated user from auth route: ${pathname}`);
+      console.log(`[Middleware] Redirecting authenticated user: ${pathname}`);
       
       // Check if there's a 'from' parameter to redirect back to
       const fromParam = request.nextUrl.searchParams.get('from');
@@ -89,7 +99,6 @@ export function middleware(request: NextRequest) {
   }
 
   // Allow the request to proceed
-  console.log(`[Middleware] Request allowed to proceed: ${pathname}`);
   return NextResponse.next();
 }
 
@@ -98,11 +107,12 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
+     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
   ],
 };
