@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// scripts/check-database.js - Database health check and setup with complete seeding
+// scripts/check-database.js - Database health check and setup with safe trigger handling
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -104,6 +104,202 @@ async function checkDatabaseConnection() {
   }
 }
 
+async function createSchemaOnly() {
+  loadEnv();
+  
+  const DATABASE_URL = process.env.DATABASE_URL;
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  });
+
+  try {
+    console.log('🔨 Creating database schema safely...');
+    
+    // Create schema without triggers first
+    const safeSchema = `
+      -- Enable UUID extension
+      CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+      -- Users table
+      CREATE TABLE IF NOT EXISTS users (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password VARCHAR(255) NOT NULL,
+          first_name VARCHAR(100) NOT NULL,
+          last_name VARCHAR(100) NOT NULL,
+          profile_picture TEXT,
+          bio TEXT,
+          interests TEXT[], -- Array of interests
+          location VARCHAR(255),
+          phone VARCHAR(20),
+          date_of_birth DATE,
+          verified BOOLEAN DEFAULT FALSE,
+          active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Experiences table
+      CREATE TABLE IF NOT EXISTS experiences (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          title VARCHAR(255) NOT NULL,
+          description TEXT NOT NULL,
+          category VARCHAR(100) NOT NULL,
+          price DECIMAL(10,2) NOT NULL,
+          duration INTEGER NOT NULL, -- in minutes
+          location VARCHAR(255) NOT NULL,
+          max_participants INTEGER,
+          images JSONB DEFAULT '[]'::jsonb, -- Array of image URLs
+          requirements TEXT,
+          active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Bookings table
+      CREATE TABLE IF NOT EXISTS bookings (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          experience_id UUID NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
+          guest_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          booking_date TIMESTAMP WITH TIME ZONE NOT NULL,
+          status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled')),
+          total_amount DECIMAL(10,2) NOT NULL,
+          special_requests TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Conversations table
+      CREATE TABLE IF NOT EXISTS conversations (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          participant_1 UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          participant_2 UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          last_message_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(participant_1, participant_2)
+      );
+
+      -- Messages table
+      CREATE TABLE IF NOT EXISTS messages (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+          sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          content TEXT NOT NULL,
+          message_type VARCHAR(20) DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'booking')),
+          read_at TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Reviews table
+      CREATE TABLE IF NOT EXISTS reviews (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+          reviewer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          reviewee_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+          comment TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Availability table (for experience scheduling)
+      CREATE TABLE IF NOT EXISTS availability (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          experience_id UUID NOT NULL REFERENCES experiences(id) ON DELETE CASCADE,
+          available_date DATE NOT NULL,
+          start_time TIME NOT NULL,
+          end_time TIME NOT NULL,
+          is_available BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Indexes for better performance
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE INDEX IF NOT EXISTS idx_experiences_host_id ON experiences(host_id);
+      CREATE INDEX IF NOT EXISTS idx_experiences_category ON experiences(category);
+      CREATE INDEX IF NOT EXISTS idx_experiences_location ON experiences(location);
+      CREATE INDEX IF NOT EXISTS idx_experiences_price ON experiences(price);
+      CREATE INDEX IF NOT EXISTS idx_experiences_active ON experiences(active);
+      CREATE INDEX IF NOT EXISTS idx_bookings_experience_id ON bookings(experience_id);
+      CREATE INDEX IF NOT EXISTS idx_bookings_guest_id ON bookings(guest_id);
+      CREATE INDEX IF NOT EXISTS idx_bookings_host_id ON bookings(host_id);
+      CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+      CREATE INDEX IF NOT EXISTS idx_bookings_booking_date ON bookings(booking_date);
+      CREATE INDEX IF NOT EXISTS idx_conversations_participants ON conversations(participant_1, participant_2);
+      CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
+      CREATE INDEX IF NOT EXISTS idx_reviews_booking_id ON reviews(booking_id);
+      CREATE INDEX IF NOT EXISTS idx_reviews_reviewer_id ON reviews(reviewer_id);
+      CREATE INDEX IF NOT EXISTS idx_reviews_reviewee_id ON reviews(reviewee_id);
+      CREATE INDEX IF NOT EXISTS idx_availability_experience_id ON availability(experience_id);
+      CREATE INDEX IF NOT EXISTS idx_availability_date ON availability(available_date);
+    `;
+    
+    await pool.query(safeSchema);
+    console.log('✅ Schema created successfully');
+    
+    // Now handle triggers separately and safely
+    console.log('🔧 Setting up triggers safely...');
+    
+    try {
+      // Create the function if it doesn't exist
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+      `);
+      
+      // Check and create triggers one by one
+      const triggers = [
+        { table: 'users', trigger: 'update_users_updated_at' },
+        { table: 'experiences', trigger: 'update_experiences_updated_at' },
+        { table: 'bookings', trigger: 'update_bookings_updated_at' }
+      ];
+      
+      for (const { table, trigger } of triggers) {
+        // Check if trigger exists
+        const triggerExists = await pool.query(`
+          SELECT EXISTS (
+            SELECT 1 FROM information_schema.triggers 
+            WHERE trigger_name = $1 AND event_object_table = $2
+          );
+        `, [trigger, table]);
+        
+        if (!triggerExists.rows[0].exists) {
+          await pool.query(`
+            CREATE TRIGGER ${trigger}
+                BEFORE UPDATE ON ${table}
+                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+          `);
+          console.log(`✅ Created trigger: ${trigger}`);
+        } else {
+          console.log(`ℹ️  Trigger already exists: ${trigger}`);
+        }
+      }
+      
+      console.log('✅ Triggers setup completed');
+      
+    } catch (triggerError) {
+      console.log('⚠️  Trigger setup had issues, but continuing (triggers are optional)');
+      console.log(`   Error: ${triggerError.message}`);
+    }
+    
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Schema creation failed:', error.message);
+    throw error;
+  } finally {
+    await pool.end();
+  }
+}
+
 async function runMigrations() {
   loadEnv();
   
@@ -116,14 +312,8 @@ async function runMigrations() {
   try {
     console.log('🔨 Running database migrations...');
     
-    // Read and execute schema
-    const schemaPath = path.join(process.cwd(), 'sql', 'schema.sql');
-    if (fs.existsSync(schemaPath)) {
-      console.log('📄 Executing schema.sql...');
-      const schema = fs.readFileSync(schemaPath, 'utf8');
-      await pool.query(schema);
-      console.log('✅ Schema created successfully');
-    }
+    // Create schema safely
+    await createSchemaOnly();
     
     // Check if we need to run seed data
     const userCount = await pool.query('SELECT COUNT(*) FROM users');
