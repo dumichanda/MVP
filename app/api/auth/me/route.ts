@@ -1,3 +1,4 @@
+// app/api/auth/me/route.ts - Fix the missing getUserById import
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromToken } from '@/lib/auth';
 
