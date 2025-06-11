@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// scripts/check-database.js - Database health check and setup with safe trigger handling
+// scripts/check-database.js - Database health check and setup with correct schema handling
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -69,17 +69,53 @@ async function checkDatabaseConnection() {
     const userCount = await pool.query('SELECT COUNT(*) FROM users');
     const experienceCount = await pool.query('SELECT COUNT(*) FROM experiences');
     
-    // Check other tables
+    // Check other tables safely
     let bookingCount = { rows: [{ count: 0 }] };
     let conversationCount = { rows: [{ count: 0 }] };
     let messageCount = { rows: [{ count: 0 }] };
     
     try {
-      bookingCount = await pool.query('SELECT COUNT(*) FROM bookings');
-      conversationCount = await pool.query('SELECT COUNT(*) FROM conversations');
-      messageCount = await pool.query('SELECT COUNT(*) FROM messages');
+      // Check if bookings table exists
+      const bookingsTableExists = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'bookings'
+        );
+      `);
+      
+      if (bookingsTableExists.rows[0].exists) {
+        bookingCount = await pool.query('SELECT COUNT(*) FROM bookings');
+      }
+      
+      // Check if conversations table exists
+      const conversationsTableExists = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'conversations'
+        );
+      `);
+      
+      if (conversationsTableExists.rows[0].exists) {
+        conversationCount = await pool.query('SELECT COUNT(*) FROM conversations');
+      }
+      
+      // Check if messages table exists
+      const messagesTableExists = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'messages'
+        );
+      `);
+      
+      if (messagesTableExists.rows[0].exists) {
+        messageCount = await pool.query('SELECT COUNT(*) FROM messages');
+      }
+      
     } catch (error) {
-      // Tables might not exist yet
+      console.log('ℹ️  Some tables don\'t exist yet, will be created');
     }
     
     console.log(`📊 Database status:`);
@@ -116,7 +152,7 @@ async function createSchemaOnly() {
   try {
     console.log('🔨 Creating database schema safely...');
     
-    // Create schema without triggers first
+    // Create schema without triggers first - using the EXACT schema from sql/schema.sql
     const safeSchema = `
       -- Enable UUID extension
       CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -172,7 +208,7 @@ async function createSchemaOnly() {
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
-      -- Conversations table
+      -- Conversations table (using participant_1 and participant_2 as expected)
       CREATE TABLE IF NOT EXISTS conversations (
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
           participant_1 UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
