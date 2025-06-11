@@ -30,10 +30,10 @@ export interface AuthResult {
 export async function hashPassword(password: string): Promise<string> {
   try {
     const hash = await bcrypt.hash(password, 12);
-    logger.debug('Auth', 'Password hashed successfully');
+    logger.debug('Password hashed successfully', 'Auth');
     return hash;
   } catch (error) {
-    logger.error('Auth', 'Failed to hash password', { error });
+    logger.error(`Failed to hash password: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
     throw error;
   }
 }
@@ -42,10 +42,10 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
   try {
     const isValid = await bcrypt.compare(password, hashedPassword);
-    logger.debug('Auth', `Password verification: ${isValid ? 'success' : 'failed'}`);
+    logger.debug(`Password verification: ${isValid ? 'success' : 'failed'}`, 'Auth');
     return isValid;
   } catch (error) {
-    logger.error('Auth', 'Failed to verify password', { error });
+    logger.error(`Failed to verify password: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
     throw error;
   }
 }
@@ -54,10 +54,10 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 export function generateToken(userId: string): string {
   try {
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
-    logger.debug('Auth', 'JWT token generated successfully');
+    logger.debug('JWT token generated successfully', 'Auth');
     return token;
   } catch (error) {
-    logger.error('Auth', 'Failed to generate JWT token', { error });
+    logger.error(`Failed to generate JWT token: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
     throw error;
   }
 }
@@ -66,10 +66,10 @@ export function generateToken(userId: string): string {
 export function verifyToken(token: string): { userId: string } | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    logger.debug('Auth', 'JWT token verified successfully');
+    logger.debug('JWT token verified successfully', 'Auth');
     return decoded;
   } catch (error) {
-    logger.debug('Auth', 'JWT token verification failed', { error });
+    logger.debug(`JWT token verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
     return null;
   }
 }
@@ -82,14 +82,14 @@ export async function signUp(userData: {
   lastName: string;
 }): Promise<AuthResult> {
   try {
-    logger.info('Auth', `Sign up attempt for email: ${userData.email}`);
+    logger.info(`Sign up attempt for email: ${userData.email}`, 'Auth');
     
     const { email, password, firstName, lastName } = userData;
 
     // Check if user already exists
     const existingUser = await getUser(email);
     if (existingUser) {
-      logger.warn('Auth', `Sign up failed - user already exists: ${email}`);
+      logger.warn(`Sign up failed - user already exists: ${email}`, 'Auth');
       return { success: false, error: 'User already exists' };
     }
 
@@ -110,7 +110,7 @@ export async function signUp(userData: {
     // Remove password from response
     const { password: _, ...userWithoutPassword } = newUser;
 
-    logger.info('Auth', `User signed up successfully: ${email}`);
+    logger.info(`User signed up successfully: ${email}`, 'Auth');
 
     return {
       success: true,
@@ -125,7 +125,7 @@ export async function signUp(userData: {
       token,
     };
   } catch (error) {
-    logger.error('Auth', `Sign up failed for email: ${userData.email}`, { error });
+    logger.error(`Sign up failed for email: ${userData.email} - ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
     return { success: false, error: 'Failed to create account' };
   }
 }
@@ -133,26 +133,26 @@ export async function signUp(userData: {
 // Sign in user
 export async function signIn(email: string, password: string): Promise<AuthResult> {
   try {
-    logger.info('Auth', `Sign in attempt for email: ${email}`);
+    logger.info(`Sign in attempt for email: ${email}`, 'Auth');
 
     // Get user from database
     const user = await getUser(email);
     if (!user) {
-      logger.warn('Auth', `Sign in failed - user not found: ${email}`);
+      logger.warn(`Sign in failed - user not found: ${email}`, 'Auth');
       return { success: false, error: 'Invalid credentials' };
     }
 
     // Verify password
     const isValid = await verifyPassword(password, user.password);
     if (!isValid) {
-      logger.warn('Auth', `Sign in failed - invalid password: ${email}`);
+      logger.warn(`Sign in failed - invalid password: ${email}`, 'Auth');
       return { success: false, error: 'Invalid credentials' };
     }
 
     // Generate token
     const token = generateToken(user.id);
 
-    logger.info('Auth', `User signed in successfully: ${email}`);
+    logger.info(`User signed in successfully: ${email}`, 'Auth');
 
     return {
       success: true,
@@ -171,7 +171,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       token,
     };
   } catch (error) {
-    logger.error('Auth', `Sign in failed for email: ${email}`, { error });
+    logger.error(`Sign in failed for email: ${email} - ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
     return { success: false, error: 'Failed to sign in' };
   }
 }
@@ -186,12 +186,12 @@ export async function getUserFromToken(token: string): Promise<User | null> {
 
     const user = await query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
     if (!user.rows[0]) {
-      logger.warn('Auth', `User not found for token: ${decoded.userId}`);
+      logger.warn(`User not found for token: ${decoded.userId}`, 'Auth');
       return null;
     }
 
     const userData = user.rows[0];
-    logger.debug('Auth', `User retrieved from token: ${userData.email}`);
+    logger.debug(`User retrieved from token: ${userData.email}`, 'Auth');
     
     return {
       id: userData.id,
@@ -206,7 +206,7 @@ export async function getUserFromToken(token: string): Promise<User | null> {
       createdAt: userData.created_at,
     };
   } catch (error) {
-    logger.error('Auth', 'Failed to get user from token', { error });
+    logger.error(`Failed to get user from token: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
     return null;
   }
 }
