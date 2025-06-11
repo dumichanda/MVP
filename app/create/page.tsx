@@ -148,7 +148,7 @@ export default function CreateOffer() {
       // Redirect to the created experience or home
       router.push('/');
     } catch (error) {
-      logger.error(error, 'CreateOffer');
+      logger.error(error instanceof Error ? error.message : String(error), 'CreateOffer');
       setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setIsLoading(false);
