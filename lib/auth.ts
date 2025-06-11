@@ -30,10 +30,10 @@ export interface AuthResult {
 export async function hashPassword(password: string): Promise<string> {
   try {
     const hash = await bcrypt.hash(password, 12);
-    logger.debug('Password hashed successfully', 'Auth');
+    logger.debug('Password hashed successfully', undefined, 'Auth');
     return hash;
   } catch (error) {
-    logger.error(`Failed to hash password: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
+    logger.error(error instanceof Error ? error : new Error(String(error)), 'Auth');
     throw error;
   }
 }
@@ -42,10 +42,10 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
   try {
     const isValid = await bcrypt.compare(password, hashedPassword);
-    logger.debug(`Password verification: ${isValid ? 'success' : 'failed'}`, 'Auth');
+    logger.debug(`Password verification: ${isValid ? 'success' : 'failed'}`, undefined, 'Auth');
     return isValid;
   } catch (error) {
-    logger.error(`Failed to verify password: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
+    logger.error(error instanceof Error ? error : new Error(String(error)), 'Auth');
     throw error;
   }
 }
@@ -54,10 +54,10 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 export function generateToken(userId: string): string {
   try {
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
-    logger.debug('JWT token generated successfully', 'Auth');
+    logger.debug('JWT token generated successfully', undefined, 'Auth');
     return token;
   } catch (error) {
-    logger.error(`Failed to generate JWT token: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
+    logger.error(error instanceof Error ? error : new Error(String(error)), 'Auth');
     throw error;
   }
 }
@@ -66,10 +66,10 @@ export function generateToken(userId: string): string {
 export function verifyToken(token: string): { userId: string } | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    logger.debug('JWT token verified successfully', 'Auth');
+    logger.debug('JWT token verified successfully', undefined, 'Auth');
     return decoded;
   } catch (error) {
-    logger.debug(`JWT token verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
+    logger.debug(`JWT token verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`, undefined, 'Auth');
     return null;
   }
 }
@@ -125,7 +125,7 @@ export async function signUp(userData: {
       token,
     };
   } catch (error) {
-    logger.error(`Sign up failed for email: ${userData.email} - ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
+    logger.error(error instanceof Error ? error : new Error(`Sign up failed for email: ${userData.email}`), 'Auth');
     return { success: false, error: 'Failed to create account' };
   }
 }
@@ -171,7 +171,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       token,
     };
   } catch (error) {
-    logger.error(`Sign in failed for email: ${email} - ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
+    logger.error(error instanceof Error ? error : new Error(`Sign in failed for email: ${email}`), 'Auth');
     return { success: false, error: 'Failed to sign in' };
   }
 }
@@ -191,7 +191,7 @@ export async function getUserFromToken(token: string): Promise<User | null> {
     }
 
     const userData = user.rows[0];
-    logger.debug(`User retrieved from token: ${userData.email}`, 'Auth');
+    logger.debug(`User retrieved from token: ${userData.email}`, undefined, 'Auth');
     
     return {
       id: userData.id,
@@ -206,7 +206,7 @@ export async function getUserFromToken(token: string): Promise<User | null> {
       createdAt: userData.created_at,
     };
   } catch (error) {
-    logger.error(`Failed to get user from token: ${error instanceof Error ? error.message : 'Unknown error'}`, 'Auth');
+    logger.error(error instanceof Error ? error : new Error('Failed to get user from token'), 'Auth');
     return null;
   }
 }

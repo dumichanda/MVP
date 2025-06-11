@@ -1,4 +1,4 @@
-// lib/logger.ts - Simple logger utility
+// lib/logger.ts - Fixed logger utility with proper method signatures
 export class Logger {
   private static instance: Logger;
   
@@ -9,27 +9,29 @@ export class Logger {
     return Logger.instance;
   }
 
-  private formatMessage(level: string, message: string, context?: string): string {
+  private formatMessage(level: string, message: string, data?: any, context?: string): string {
     const timestamp = new Date().toISOString();
     const contextStr = context ? `[${context}] ` : '';
-    return `${timestamp} ${contextStr}${level}: ${message}`;
+    const dataStr = data ? ` ${JSON.stringify(data)}` : '';
+    return `${timestamp} ${contextStr}${level}: ${message}${dataStr}`;
   }
 
-  error(message: string, context?: string) {
-    console.error(this.formatMessage('ERROR', message, context));
+  error(message: string | Error, context?: string) {
+    const errorMessage = message instanceof Error ? message.message : message;
+    console.error(this.formatMessage('ERROR', errorMessage, undefined, context));
   }
 
   warn(message: string, context?: string) {
-    console.warn(this.formatMessage('WARN', message, context));
+    console.warn(this.formatMessage('WARN', message, undefined, context));
   }
 
   info(message: string, context?: string) {
-    console.info(this.formatMessage('INFO', message, context));
+    console.info(this.formatMessage('INFO', message, undefined, context));
   }
 
-  debug(message: string, context?: string) {
+  debug(message: string, data?: any, context?: string) {
     if (process.env.NODE_ENV === 'development') {
-      console.debug(this.formatMessage('DEBUG', message, context));
+      console.debug(this.formatMessage('DEBUG', message, data, context));
     }
   }
 }
@@ -38,5 +40,6 @@ export const logger = Logger.getInstance();
 
 // API error handler
 export function handleApiError(error: any, endpoint: string) {
-  logger.error(`API Error in ${endpoint}: ${error instanceof Error ? error.message : JSON.stringify(error)}`, 'API');
+  const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+  logger.error(`API Error in ${endpoint}: ${errorMessage}`, 'API');
 }

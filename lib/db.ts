@@ -51,7 +51,7 @@ export async function query(text: string, params?: any[]) {
     const client = await pool.connect();
     
     try {
-      logger.debug(`Executing: ${text.substring(0, 100)}... (${params?.length || 0} params)`, 'Database Query');
+      logger.debug(`Executing: ${text.substring(0, 100)}... (${params?.length || 0} params)`, undefined, 'Database Query');
       
       const result = await client.query(text, params);
       const duration = Date.now() - startTime;
@@ -87,7 +87,7 @@ export async function queryServerless(text: string, params?: any[]) {
   
   try {
     const result = await tempPool.query(text, params);
-    logger.debug('Query executed successfully', 'Database Query (Serverless)');
+    logger.debug('Query executed successfully', undefined, 'Database Query (Serverless)');
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

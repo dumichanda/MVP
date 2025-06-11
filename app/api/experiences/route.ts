@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       experiences: result.rows,
     });
   } catch (error) {
-    logger.error(error, 'API:experiences - Failed to fetch experiences');
+    logger.error(error instanceof Error ? error : new Error(String(error)), 'API:experiences');
     handleApiError(error, 'GET /api/experiences');
     return NextResponse.json(
       { error: 'Failed to fetch experiences' },
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create experience
-    logger.debug('Inserting experience into database', 'API:experiences');
+    logger.debug('Inserting experience into database', undefined, 'API:experiences');
     const result = await query(
       `INSERT INTO experiences (
         host_id, title, description, category, price, duration,
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       experience: result.rows[0],
     });
   } catch (error) {
-    logger.error(error, 'API:experiences - Failed to create experience');
+    logger.error(error instanceof Error ? error : new Error(String(error)), 'API:experiences');
     handleApiError(error, 'POST /api/experiences');
     return NextResponse.json(
       { error: 'Failed to create experience' },
