@@ -51,10 +51,10 @@ export default function SignUpPage() {
       const from = searchParams.get('from');
       if (from && from !== '/auth' && from !== '/auth/signup') {
         console.log(`[Auth] Signup - redirecting to original destination: ${from}`);
-        router.push(from);
+        window.location.href = from; // Force full page navigation
       } else {
         console.log('[Auth] Signup - redirecting to home');
-        router.push('/');
+        window.location.href = '/'; // Force full page navigation
       }
     } catch (err: any) {
       setError(err.message || 'Signup failed');

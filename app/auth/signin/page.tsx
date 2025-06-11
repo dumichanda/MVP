@@ -35,10 +35,10 @@ export default function SignInPage() {
       const from = searchParams.get('from');
       if (from && from !== '/auth' && from !== '/auth/signin') {
         console.log(`[Auth] Redirecting to original destination: ${from}`);
-        router.push(from);
+        window.location.href = from; // Force full page navigation
       } else {
         console.log('[Auth] Redirecting to home');
-        router.push('/');
+        window.location.href = '/'; // Force full page navigation
       }
     } catch (err: any) {
       setError(err.message || 'Login failed');
@@ -59,10 +59,10 @@ export default function SignInPage() {
       const from = searchParams.get('from');
       if (from && from !== '/auth' && from !== '/auth/signin') {
         console.log(`[Auth] Demo login - redirecting to original destination: ${from}`);
-        router.push(from);
+        window.location.href = from; // Force full page navigation
       } else {
         console.log('[Auth] Demo login - redirecting to home');
-        router.push('/');
+        window.location.href = '/'; // Force full page navigation
       }
     } catch (err: any) {
       setError(err.message || 'Demo login failed');
