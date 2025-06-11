@@ -1,6 +1,6 @@
-// middleware.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './lib/auth';
+import { logger } from './lib/logger';
 
 // Define protected routes
 const protectedRoutes = [
@@ -11,6 +11,7 @@ const protectedRoutes = [
   '/api/experiences',
   '/api/bookings',
   '/api/messages',
+  '/api/profile',
 ];
 
 // Define auth routes (redirect to dashboard if already authenticated)
@@ -19,6 +20,11 @@ const authRoutes = ['/auth/signin', '/auth/signup'];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth-token')?.value;
+
+  logger.debug('Middleware processing request', { 
+    pathname, 
+    hasToken: !!token 
+  }, 'Middleware');
 
   // Check if the current path is protected
   const isProtectedRoute = protectedRoutes.some(route => 
@@ -33,7 +39,7 @@ export function middleware(request: NextRequest) {
   // Handle protected routes
   if (isProtectedRoute) {
     if (!token) {
-      // Redirect to signin if no token
+      logger.info('Redirecting to signin - no token', { pathname }, 'Middleware');
       const signInUrl = new URL('/auth/signin', request.url);
       signInUrl.searchParams.set('from', pathname);
       return NextResponse.redirect(signInUrl);
@@ -42,7 +48,7 @@ export function middleware(request: NextRequest) {
     // Verify token
     const decoded = verifyToken(token);
     if (!decoded) {
-      // Invalid token, redirect to signin
+      logger.warn('Redirecting to signin - invalid token', { pathname }, 'Middleware');
       const signInUrl = new URL('/auth/signin', request.url);
       signInUrl.searchParams.set('from', pathname);
       const response = NextResponse.redirect(signInUrl);
@@ -57,18 +63,25 @@ export function middleware(request: NextRequest) {
       
       return response;
     }
+
+    logger.debug('Access granted to protected route', { 
+      pathname, userId: decoded.userId 
+    }, 'Middleware');
   }
 
   // Handle auth routes (redirect if already authenticated)
   if (isAuthRoute && token) {
     const decoded = verifyToken(token);
     if (decoded) {
-      // User is authenticated, redirect to dashboard
-      return NextResponse.redirect(new URL('/offers', request.url));
+      logger.info('Redirecting authenticated user from auth page', { 
+        pathname, userId: decoded.userId 
+      }, 'Middleware');
+      return NextResponse.redirect(new URL('/', request.url));
     }
   }
 
   // Allow the request to proceed
+  logger.debug('Request allowed to proceed', { pathname }, 'Middleware');
   return NextResponse.next();
 }
 

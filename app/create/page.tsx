@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, Upload, Plus, Calendar, Clock, X } from 'lucide-react';
+import { ArrowLeft, Upload, Plus, Calendar, Clock, X, MapPin, Users, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { logger } from '@/lib/logger';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface TimeSlot {
   date: string;
@@ -29,6 +31,7 @@ interface FormData {
 }
 
 export default function CreateOffer() {
+  const router = useRouter();
   const [formData, setFormData] = useState<FormData>({
     title: '',
     description: '',
@@ -38,10 +41,12 @@ export default function CreateOffer() {
     price: '',
     maxGuests: '2',
     images: [],
-    timeSlots: [{ date: '2025/05/24', fromTime: '14:00', toTime: '16:00' }]
+    timeSlots: [{ date: '2025-06-24', fromTime: '14:00', toTime: '16:00' }]
   });
 
   const [imageUrl, setImageUrl] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const categories = [
     'Dining',
@@ -55,19 +60,22 @@ export default function CreateOffer() {
   ];
 
   const updateFormData = (field: keyof FormData, value: any) => {
+    logger.debug('Form field updated', { field, value }, 'CreateOffer');
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const addTimeSlot = () => {
     if (formData.timeSlots.length < 10) {
+      logger.debug('Adding time slot', { currentCount: formData.timeSlots.length }, 'CreateOffer');
       setFormData(prev => ({
         ...prev,
-        timeSlots: [...prev.timeSlots, { date: '2025/05/24', fromTime: '14:00', toTime: '16:00' }]
+        timeSlots: [...prev.timeSlots, { date: '2025-06-24', fromTime: '14:00', toTime: '16:00' }]
       }));
     }
   };
 
   const updateTimeSlot = (index: number, field: keyof TimeSlot, value: string) => {
+    logger.debug('Updating time slot', { index, field, value }, 'CreateOffer');
     const newSlots = [...formData.timeSlots];
     newSlots[index] = { ...newSlots[index], [field]: value };
     setFormData(prev => ({ ...prev, timeSlots: newSlots }));
@@ -75,6 +83,7 @@ export default function CreateOffer() {
 
   const removeTimeSlot = (index: number) => {
     if (formData.timeSlots.length > 1) {
+      logger.debug('Removing time slot', { index }, 'CreateOffer');
       const newSlots = formData.timeSlots.filter((_, i) => i !== index);
       setFormData(prev => ({ ...prev, timeSlots: newSlots }));
     }
@@ -82,6 +91,7 @@ export default function CreateOffer() {
 
   const addImageUrl = () => {
     if (imageUrl && formData.images.length < 5) {
+      logger.debug('Adding image URL', { url: imageUrl }, 'CreateOffer');
       setFormData(prev => ({
         ...prev,
         images: [...prev.images, imageUrl]
@@ -91,14 +101,58 @@ export default function CreateOffer() {
   };
 
   const removeImage = (index: number) => {
+    logger.debug('Removing image', { index }, 'CreateOffer');
     const newImages = formData.images.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, images: newImages }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Creating offer:', formData);
-    // Handle form submission here
+    setIsLoading(true);
+    setError('');
+
+    try {
+      logger.info('Creating experience', 'CreateOffer');
+      logger.debug('Form data', formData, 'CreateOffer');
+
+      const response = await fetch('/api/experiences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          price: parseFloat(formData.price),
+          duration: 120, // Default 2 hours
+          location: formData.location,
+          maxParticipants: parseInt(formData.maxGuests),
+          images: formData.images,
+          requirements: '',
+        }),
+      });
+
+      logger.debug('API response status', { status: response.status }, 'CreateOffer');
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        logger.error('API error response', errorData, 'CreateOffer');
+        throw new Error(errorData.error || 'Failed to create experience');
+      }
+
+      const data = await response.json();
+      logger.info('Experience created successfully', 'CreateOffer');
+      logger.debug('Response data', data, 'CreateOffer');
+
+      // Redirect to the created experience or home
+      router.push('/');
+    } catch (error) {
+      logger.error(error, 'CreateOffer');
+      setError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -118,15 +172,19 @@ export default function CreateOffer() {
               <Button variant="outline" size="sm" className="border-gray-600 text-gray-300">
                 🔔
               </Button>
-              <Button variant="outline" size="sm" className="border-gray-600 text-gray-300">
-                🎨
-              </Button>
             </div>
           </div>
         </div>
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/20 border border-red-700 rounded-lg">
+            <p className="text-red-400">{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Offer Title */}
           <div>
@@ -161,6 +219,7 @@ export default function CreateOffer() {
           {/* Location */}
           <div>
             <Label htmlFor="location" className="text-white mb-2 block">
+              <MapPin className="w-4 h-4 inline mr-1" />
               Location <span className="text-red-400">*</span>
             </Label>
             <Input
@@ -210,6 +269,7 @@ export default function CreateOffer() {
             
             <div>
               <Label htmlFor="price" className="text-white mb-2 block">
+                <DollarSign className="w-4 h-4 inline mr-1" />
                 Price (R) <span className="text-red-400">*</span>
               </Label>
               <Input
@@ -225,6 +285,7 @@ export default function CreateOffer() {
             
             <div>
               <Label htmlFor="maxGuests" className="text-white mb-2 block">
+                <Users className="w-4 h-4 inline mr-1" />
                 Max Guests <span className="text-red-400">*</span>
               </Label>
               <Input
@@ -269,7 +330,7 @@ export default function CreateOffer() {
                       disabled={!imageUrl || formData.images.length >= 5}
                       className="bg-red-500 hover:bg-red-600 text-white border border-red-500"
                     >
-                      Add Image URL
+                      Add URL
                     </Button>
                   </div>
                 </div>
@@ -309,6 +370,7 @@ export default function CreateOffer() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <Label className="text-white">
+                <Calendar className="w-4 h-4 inline mr-1" />
                 Available Slots (max 10) <span className="text-red-400">*</span>
               </Label>
               <Button
@@ -392,8 +454,9 @@ export default function CreateOffer() {
             type="submit"
             className="w-full bg-red-500 hover:bg-red-600 text-white py-3 text-lg font-semibold"
             size="lg"
+            disabled={isLoading}
           >
-            Create Offer
+            {isLoading ? 'Creating Offer...' : 'Create Offer'}
           </Button>
         </form>
       </div>

@@ -1,18 +1,22 @@
-// app/api/experiences/route.ts
-export const runtime = 'nodejs';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getUserFromToken } from '@/lib/auth';
+import { logger, handleApiError } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
+    logger.info('Fetching experiences', 'API:experiences');
+    
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const location = searchParams.get('location');
     const priceMin = searchParams.get('priceMin');
     const priceMax = searchParams.get('priceMax');
     const search = searchParams.get('search');
+
+    logger.debug('Search parameters', { 
+      category, location, priceMin, priceMax, search 
+    }, 'API:experiences');
 
     let queryText = `
       SELECT e.*, u.first_name, u.last_name, u.profile_picture as host_picture
@@ -55,14 +59,20 @@ export async function GET(request: NextRequest) {
 
     queryText += ' ORDER BY e.created_at DESC';
 
+    logger.debug('Executing experiences query', { queryText }, 'API:experiences');
     const result = await query(queryText, queryParams);
+
+    logger.info('Experiences fetched successfully', { 
+      count: result.rows.length 
+    }, 'API:experiences');
 
     return NextResponse.json({
       success: true,
       experiences: result.rows,
     });
   } catch (error) {
-    console.error('Get experiences error:', error);
+    logger.error('Failed to fetch experiences', 'API:experiences');
+    handleApiError(error, 'GET /api/experiences');
     return NextResponse.json(
       { error: 'Failed to fetch experiences' },
       { status: 500 }
@@ -72,9 +82,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    logger.info('Creating new experience', 'API:experiences');
+    
     // Get token from cookie
     const token = request.cookies.get('auth-token')?.value;
     if (!token) {
+      logger.warn('No auth token provided', 'API:experiences');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -84,11 +97,14 @@ export async function POST(request: NextRequest) {
     // Get user from token
     const user = await getUserFromToken(token);
     if (!user) {
+      logger.warn('Invalid auth token', 'API:experiences');
       return NextResponse.json(
         { error: 'Invalid authentication' },
         { status: 401 }
       );
     }
+
+    logger.debug('User authenticated', { userId: user.id }, 'API:experiences');
 
     const {
       title,
@@ -102,8 +118,16 @@ export async function POST(request: NextRequest) {
       requirements,
     } = await request.json();
 
+    logger.debug('Experience data received', { 
+      title, category, price, location 
+    }, 'API:experiences');
+
     // Validate required fields
     if (!title || !description || !category || !price || !duration || !location) {
+      logger.warn('Missing required fields', { 
+        title: !!title, description: !!description, category: !!category, 
+        price: !!price, duration: !!duration, location: !!location 
+      }, 'API:experiences');
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -111,6 +135,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create experience
+    logger.debug('Inserting experience into database', undefined, 'API:experiences');
     const result = await query(
       `INSERT INTO experiences (
         host_id, title, description, category, price, duration,
@@ -130,12 +155,17 @@ export async function POST(request: NextRequest) {
       ]
     );
 
+    logger.info('Experience created successfully', { 
+      experienceId: result.rows[0].id 
+    }, 'API:experiences');
+
     return NextResponse.json({
       success: true,
       experience: result.rows[0],
     });
   } catch (error) {
-    console.error('Create experience error:', error);
+    logger.error('Failed to create experience', 'API:experiences');
+    handleApiError(error, 'POST /api/experiences');
     return NextResponse.json(
       { error: 'Failed to create experience' },
       { status: 500 }
