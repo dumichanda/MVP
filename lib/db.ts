@@ -19,7 +19,7 @@ function getPool(): Pool {
     
     if (!DATABASE_URL) {
       connectionError = 'DATABASE_URL environment variable is not set. Please configure your database connection.';
-      logger.error('Database Configuration', connectionError);
+      logger.error(connectionError, 'Database Configuration');
       throw new Error(connectionError);
     }
 
@@ -31,10 +31,10 @@ function getPool(): Pool {
         connectionTimeoutMillis: 2000,
       });
       
-      logger.info('Database Configuration', 'Database pool initialized successfully');
+      logger.info('Database pool initialized successfully', 'Database Configuration');
     } catch (error) {
       connectionError = `Failed to initialize database pool: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      logger.error('Database Configuration', connectionError);
+      logger.error(connectionError, 'Database Configuration');
       throw new Error(connectionError);
     }
   }
@@ -51,15 +51,12 @@ export async function query(text: string, params?: any[]) {
     const client = await pool.connect();
     
     try {
-      logger.debug('Database Query', `Executing: ${text.substring(0, 100)}...`, { params: params?.length || 0 });
+      logger.debug(`Executing: ${text.substring(0, 100)}... (${params?.length || 0} params)`, 'Database Query');
       
       const result = await client.query(text, params);
       const duration = Date.now() - startTime;
       
-      logger.info('Database Query', `Query completed in ${duration}ms`, {
-        rowCount: result.rowCount,
-        duration
-      });
+      logger.info(`Query completed in ${duration}ms - ${result.rowCount} rows`, 'Database Query');
       
       return result;
     } finally {
@@ -69,11 +66,7 @@ export async function query(text: string, params?: any[]) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
     
-    logger.error('Database Query', `Query failed after ${duration}ms: ${errorMessage}`, {
-      query: text.substring(0, 100),
-      duration,
-      error: errorMessage
-    });
+    logger.error(`Query failed after ${duration}ms: ${errorMessage}`, 'Database Query');
     
     throw error;
   }
@@ -85,7 +78,7 @@ export async function queryServerless(text: string, params?: any[]) {
   
   if (!DATABASE_URL) {
     const error = 'DATABASE_URL environment variable is not set';
-    logger.error('Database Configuration', error);
+    logger.error(error, 'Database Configuration');
     throw new Error(error);
   }
 
@@ -94,11 +87,11 @@ export async function queryServerless(text: string, params?: any[]) {
   
   try {
     const result = await tempPool.query(text, params);
-    logger.debug('Database Query (Serverless)', 'Query executed successfully');
+    logger.debug('Query executed successfully', 'Database Query (Serverless)');
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Database Query (Serverless)', `Query failed: ${errorMessage}`);
+    logger.error(`Query failed: ${errorMessage}`, 'Database Query (Serverless)');
     throw error;
   } finally {
     await tempPool.end();
@@ -111,7 +104,7 @@ export async function getUser(email: string) {
     const result = await query('SELECT * FROM users WHERE email = $1', [email]);
     return result.rows[0];
   } catch (error) {
-    logger.error('Database Helper', `Failed to get user by email: ${email}`, { error });
+    logger.error(`Failed to get user by email: ${email}`, 'Database Helper');
     throw error;
   }
 }
@@ -121,7 +114,7 @@ export async function getUserById(id: string) {
     const result = await query('SELECT * FROM users WHERE id = $1', [id]);
     return result.rows[0];
   } catch (error) {
-    logger.error('Database Helper', `Failed to get user by ID: ${id}`, { error });
+    logger.error(`Failed to get user by ID: ${id}`, 'Database Helper');
     throw error;
   }
 }
@@ -139,10 +132,10 @@ export async function createUser(userData: {
       [email, password, firstName, lastName]
     );
     
-    logger.info('Database Helper', `User created successfully: ${email}`);
+    logger.info(`User created successfully: ${email}`, 'Database Helper');
     return result.rows[0];
   } catch (error) {
-    logger.error('Database Helper', `Failed to create user: ${userData.email}`, { error });
+    logger.error(`Failed to create user: ${userData.email}`, 'Database Helper');
     throw error;
   }
 }
@@ -151,10 +144,10 @@ export async function createUser(userData: {
 export async function checkDatabaseConnection(): Promise<boolean> {
   try {
     await query('SELECT 1');
-    logger.info('Database Health', 'Database connection is healthy');
+    logger.info('Database connection is healthy', 'Database Health');
     return true;
   } catch (error) {
-    logger.error('Database Health', 'Database connection failed', { error });
+    logger.error('Database connection failed', 'Database Health');
     return false;
   }
 }
