@@ -137,7 +137,7 @@ export default function CreateOffer() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        logger.error('API error response', errorData, 'CreateOffer');
+        logger.error(`API error response: ${JSON.stringify(errorData)}`, 'CreateOffer');
         throw new Error(errorData.error || 'Failed to create experience');
       }
 
