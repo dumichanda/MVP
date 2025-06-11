@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// scripts/check-database.js - Database health check and setup
+// scripts/check-database.js - Database health check and setup with complete seeding
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -69,14 +69,31 @@ async function checkDatabaseConnection() {
     const userCount = await pool.query('SELECT COUNT(*) FROM users');
     const experienceCount = await pool.query('SELECT COUNT(*) FROM experiences');
     
+    // Check other tables
+    let bookingCount = { rows: [{ count: 0 }] };
+    let conversationCount = { rows: [{ count: 0 }] };
+    let messageCount = { rows: [{ count: 0 }] };
+    
+    try {
+      bookingCount = await pool.query('SELECT COUNT(*) FROM bookings');
+      conversationCount = await pool.query('SELECT COUNT(*) FROM conversations');
+      messageCount = await pool.query('SELECT COUNT(*) FROM messages');
+    } catch (error) {
+      // Tables might not exist yet
+    }
+    
     console.log(`📊 Database status:`);
     console.log(`   Users: ${userCount.rows[0].count}`);
     console.log(`   Experiences: ${experienceCount.rows[0].count}`);
+    console.log(`   Bookings: ${bookingCount.rows[0].count}`);
+    console.log(`   Conversations: ${conversationCount.rows[0].count}`);
+    console.log(`   Messages: ${messageCount.rows[0].count}`);
     
     return { 
       connected: true, 
       tablesExist: true, 
-      hasData: parseInt(userCount.rows[0].count) > 0 
+      hasData: parseInt(userCount.rows[0].count) > 0,
+      hasCompleteData: parseInt(bookingCount.rows[0].count) > 0 && parseInt(conversationCount.rows[0].count) > 0
     };
     
   } catch (error) {
@@ -140,11 +157,91 @@ async function runMigrations() {
       console.log('✅ Demo data inserted successfully');
     }
     
+    // Check if we need to add additional demo data (bookings, conversations, messages)
+    const bookingCount = await pool.query('SELECT COUNT(*) FROM bookings');
+    
+    if (parseInt(bookingCount.rows[0].count) === 0) {
+      console.log('🔗 Adding demo bookings, conversations, and messages...');
+      
+      // Get user IDs
+      const users = await pool.query('SELECT id, email FROM users ORDER BY created_at');
+      const experiences = await pool.query('SELECT id, title, host_id FROM experiences ORDER BY created_at');
+      
+      if (users.rows.length >= 4 && experiences.rows.length >= 4) {
+        const [thabo, naledi, sipho, nomsa] = users.rows;
+        const [exp1, exp2, exp3, exp4] = experiences.rows;
+        
+        // Insert demo bookings
+        await pool.query(`
+          INSERT INTO bookings (experience_id, guest_id, host_id, booking_date, status, total_amount, special_requests, created_at) VALUES
+          ($1, $2, $3, NOW() + INTERVAL '5 days', 'confirmed', 350.00, 'First time hiking Table Mountain, please bring extra water!', NOW()),
+          ($4, $5, $6, NOW() + INTERVAL '8 days', 'confirmed', 680.00, 'Celebrating a business milestone!', NOW()),
+          ($7, $8, $9, NOW() + INTERVAL '10 days', 'pending', 380.00, 'Very interested in learning about local history and culture.', NOW())
+        `, [
+          exp1.id, naledi.id, thabo.id,  // Naledi books Thabo's hike
+          exp2.id, sipho.id, naledi.id,  // Sipho books Naledi's drive
+          exp4.id, thabo.id, nomsa.id    // Thabo books Nomsa's cultural tour
+        ]);
+        
+        // Insert demo conversations
+        await pool.query(`
+          INSERT INTO conversations (participant_1, participant_2, last_message_at, created_at) VALUES
+          ($1, $2, NOW() - INTERVAL '2 hours', NOW() - INTERVAL '1 day'),
+          ($3, $4, NOW() - INTERVAL '1 hour', NOW() - INTERVAL '2 days'),
+          ($5, $6, NOW() - INTERVAL '30 minutes', NOW() - INTERVAL '3 days')
+        `, [
+          thabo.id, naledi.id,  // Thabo and Naledi
+          sipho.id, naledi.id,  // Sipho and Naledi  
+          thabo.id, nomsa.id    // Thabo and Nomsa
+        ]);
+        
+        // Get conversation IDs
+        const conversations = await pool.query('SELECT id, participant_1, participant_2 FROM conversations ORDER BY created_at');
+        
+        // Insert demo messages
+        for (const conv of conversations.rows) {
+          await pool.query(`
+            INSERT INTO messages (conversation_id, sender_id, content, created_at) VALUES
+            ($1, $2, 'Hi! I''m excited about our upcoming experience booking!', NOW() - INTERVAL '2 hours'),
+            ($1, $3, 'Hello! Yes, I''ve prepared something special. Looking forward to it!', NOW() - INTERVAL '1 hour 30 minutes'),
+            ($1, $2, 'Perfect! What time should we meet?', NOW() - INTERVAL '1 hour'),
+            ($1, $3, 'Let''s meet 15 minutes before the scheduled time. I''ll send you the exact location.', NOW() - INTERVAL '30 minutes')
+          `, [conv.id, conv.participant_1, conv.participant_2]);
+        }
+        
+        // Insert demo reviews
+        const bookings = await pool.query('SELECT id, guest_id, host_id FROM bookings WHERE status = ''confirmed''');
+        
+        if (bookings.rows.length > 0) {
+          await pool.query(`
+            INSERT INTO reviews (booking_id, reviewer_id, reviewee_id, rating, comment, created_at) VALUES
+            ($1, $2, $3, 5, 'Absolutely incredible experience! Amazing guide and the location was breathtaking. Highly recommended!', NOW() - INTERVAL '1 day'),
+            ($4, $5, $6, 5, 'What a fantastic way to explore! Perfect knowledge of the area and excellent hospitality. Will definitely book again!', NOW() - INTERVAL '2 days')
+          `, [
+            bookings.rows[0].id, bookings.rows[0].guest_id, bookings.rows[0].host_id,
+            bookings.rows[1] ? bookings.rows[1].id : bookings.rows[0].id, 
+            bookings.rows[1] ? bookings.rows[1].guest_id : bookings.rows[0].guest_id, 
+            bookings.rows[1] ? bookings.rows[1].host_id : bookings.rows[0].host_id
+          ]);
+        }
+        
+        console.log('✅ Complete demo data inserted successfully');
+      }
+    }
+    
     const finalUserCount = await pool.query('SELECT COUNT(*) FROM users');
     const finalExperienceCount = await pool.query('SELECT COUNT(*) FROM experiences');
+    const finalBookingCount = await pool.query('SELECT COUNT(*) FROM bookings');
+    const finalConversationCount = await pool.query('SELECT COUNT(*) FROM conversations');
+    const finalMessageCount = await pool.query('SELECT COUNT(*) FROM messages');
     
     console.log('🎉 Database setup completed!');
-    console.log(`📊 Final counts: ${finalUserCount.rows[0].count} users, ${finalExperienceCount.rows[0].count} experiences`);
+    console.log(`📊 Final counts:`);
+    console.log(`   Users: ${finalUserCount.rows[0].count}`);
+    console.log(`   Experiences: ${finalExperienceCount.rows[0].count}`);
+    console.log(`   Bookings: ${finalBookingCount.rows[0].count}`);
+    console.log(`   Conversations: ${finalConversationCount.rows[0].count}`);
+    console.log(`   Messages: ${finalMessageCount.rows[0].count}`);
     
     return true;
     
@@ -170,6 +267,9 @@ async function main() {
       await runMigrations();
     } else if (!status.hasData) {
       console.log('🌱 Database exists but no data found, adding demo data...');
+      await runMigrations();
+    } else if (!status.hasCompleteData) {
+      console.log('📝 Adding missing demo data (bookings, conversations, messages)...');
       await runMigrations();
     } else {
       console.log('✅ Database is ready!');

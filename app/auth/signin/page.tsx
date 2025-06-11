@@ -32,8 +32,14 @@ export default function SignInPage() {
       await signIn(loginData.email, loginData.password);
       
       // Redirect to the page they were trying to access, or home
-      const from = searchParams.get('from') || '/';
-      router.push(from);
+      const from = searchParams.get('from');
+      if (from && from !== '/auth' && from !== '/auth/signin') {
+        console.log(`[Auth] Redirecting to original destination: ${from}`);
+        router.push(from);
+      } else {
+        console.log('[Auth] Redirecting to home');
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {
@@ -50,8 +56,14 @@ export default function SignInPage() {
       await signIn(email, 'password123');
       
       // Redirect to the page they were trying to access, or home
-      const from = searchParams.get('from') || '/';
-      router.push(from);
+      const from = searchParams.get('from');
+      if (from && from !== '/auth' && from !== '/auth/signin') {
+        console.log(`[Auth] Demo login - redirecting to original destination: ${from}`);
+        router.push(from);
+      } else {
+        console.log('[Auth] Demo login - redirecting to home');
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err.message || 'Demo login failed');
     } finally {
@@ -79,6 +91,11 @@ export default function SignInPage() {
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-white mb-2">Mavuso</h1>
             <p className="text-gray-400">Welcome back! Sign in to your account</p>
+            {searchParams.get('from') && (
+              <p className="text-sm text-blue-400 mt-2">
+                Sign in to access {searchParams.get('from')?.replace('/', '')}
+              </p>
+            )}
           </div>
 
           {/* Error Message */}
@@ -161,7 +178,10 @@ export default function SignInPage() {
               <div className="mt-6 text-center">
                 <p className="text-gray-400 text-sm">
                   Don't have an account?{' '}
-                  <Link href="/auth/signup" className="text-red-400 hover:text-red-300">
+                  <Link 
+                    href={`/auth/signup${searchParams.get('from') ? `?from=${searchParams.get('from')}` : ''}`} 
+                    className="text-red-400 hover:text-red-300"
+                  >
                     Sign up here
                   </Link>
                 </p>

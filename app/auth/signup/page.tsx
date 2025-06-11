@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 export default function SignUpPage() {
   const { signUp } = useAuthContext();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -45,7 +46,16 @@ export default function SignUpPage() {
         signupData.lastName, 
         signupData.phone
       );
-      router.push('/');
+      
+      // Redirect to the page they were trying to access, or home
+      const from = searchParams.get('from');
+      if (from && from !== '/auth' && from !== '/auth/signup') {
+        console.log(`[Auth] Signup - redirecting to original destination: ${from}`);
+        router.push(from);
+      } else {
+        console.log('[Auth] Signup - redirecting to home');
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err.message || 'Signup failed');
     } finally {
@@ -73,6 +83,11 @@ export default function SignUpPage() {
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-white mb-2">Mavuso</h1>
             <p className="text-gray-400">Create your account to get started</p>
+            {searchParams.get('from') && (
+              <p className="text-sm text-blue-400 mt-2">
+                Sign up to access {searchParams.get('from')?.replace('/', '')}
+              </p>
+            )}
           </div>
 
           {/* Error Message */}
@@ -220,7 +235,10 @@ export default function SignUpPage() {
               <div className="mt-6 text-center">
                 <p className="text-gray-400 text-sm">
                   Already have an account?{' '}
-                  <Link href="/auth/signin" className="text-red-400 hover:text-red-300">
+                  <Link 
+                    href={`/auth/signin${searchParams.get('from') ? `?from=${searchParams.get('from')}` : ''}`} 
+                    className="text-red-400 hover:text-red-300"
+                  >
                     Sign in here
                   </Link>
                 </p>

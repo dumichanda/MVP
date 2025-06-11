@@ -1,4 +1,4 @@
-// middleware.ts - Fixed middleware with proper logger calls
+// middleware.ts - Fixed middleware with proper redirect handling
 import { NextRequest, NextResponse } from 'next/server';
 
 // Simple token verification without database dependency
@@ -47,7 +47,7 @@ export function middleware(request: NextRequest) {
   if (isProtectedRoute) {
     if (!token) {
       console.log(`[Middleware] Redirecting to auth - no token for protected route: ${pathname}`);
-      const authUrl = new URL('/auth', request.url);
+      const authUrl = new URL('/auth/signin', request.url);
       authUrl.searchParams.set('from', pathname);
       return NextResponse.redirect(authUrl);
     }
@@ -56,7 +56,7 @@ export function middleware(request: NextRequest) {
     const decoded = verifyTokenSimple(token);
     if (!decoded) {
       console.log(`[Middleware] Redirecting to auth - invalid token for protected route: ${pathname}`);
-      const authUrl = new URL('/auth', request.url);
+      const authUrl = new URL('/auth/signin', request.url);
       authUrl.searchParams.set('from', pathname);
       const response = NextResponse.redirect(authUrl);
       
@@ -79,7 +79,12 @@ export function middleware(request: NextRequest) {
     const decoded = verifyTokenSimple(token);
     if (decoded) {
       console.log(`[Middleware] Redirecting authenticated user from auth route: ${pathname}`);
-      return NextResponse.redirect(new URL('/', request.url));
+      
+      // Check if there's a 'from' parameter to redirect back to
+      const fromParam = request.nextUrl.searchParams.get('from');
+      const redirectUrl = fromParam && fromParam !== '/auth' ? fromParam : '/';
+      
+      return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
   }
 
