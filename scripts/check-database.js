@@ -150,7 +150,7 @@ async function runMigrations() {
         ((SELECT id FROM users WHERE email = 'thabo.mthembu@gmail.com'), 'Table Mountain Sunrise Hike & Coffee', 'Join me for an early morning hike up Table Mountain via Platteklip Gorge. Watch the sunrise over Cape Town and enjoy fresh coffee at the top.', 'Adventure', 350.00, 240, 'Table Mountain, Cape Town', 4, '["https://images.pexels.com/photos/1323550/pexels-photo-1323550.jpeg?auto=compress&cs=tinysrgb&w=800"]', 'Basic fitness level required. Bring comfortable hiking shoes and warm clothing.', true, NOW()),
         ((SELECT id FROM users WHERE email = 'naledi.williams@outlook.com'), 'Chapman''s Peak Sunset Drive & Wine', 'Experience one of the world''s most scenic drives along Chapman''s Peak. Stop at hidden viewpoints and enjoy local wine tasting.', 'Culture', 680.00, 180, 'Chapman''s Peak, Cape Town', 3, '["https://images.pexels.com/photos/1574653/pexels-photo-1574653.jpeg?auto=compress&cs=tinysrgb&w=800"]', 'Must be 18+ for wine tasting.', true, NOW()),
         ((SELECT id FROM users WHERE email = 'sipho.maharaj@gmail.com'), 'Johannesburg Gold Rush History Tour', 'Explore the fascinating history of Johannesburg''s gold mining heritage. Visit historic sites and enjoy traditional SA cuisine.', 'Culture', 480.00, 420, 'Johannesburg CBD', 8, '["https://images.pexels.com/photos/2026324/pexels-photo-2026324.jpeg?auto=compress&cs=tinysrgb&w=800"]', 'Comfortable walking shoes recommended.', true, NOW()),
-        ((SELECT id FROM users WHERE email = 'nomsa.dlamini@gmail.com'), 'Soweto Cultural Experience & Traditional Lunch', 'Authentic township tour led by a local resident. Visit Nelson Mandela''s house and share a meal with a local family.', 'Culture', 380.00, 300, 'Soweto, Johannesburg', 6, '["https://images.pexels.com/photos/1559124041/pexels-photo-1559124041.jpeg?auto=compress&cs=tinysrgb&w=800"]', 'Open mind and heart required!', true, NOW())
+        ((SELECT id FROM users WHERE email = 'nomsa.dlamini@gmail.com'), 'Soweto Cultural Experience & Traditional Lunch', 'Authentic township tour led by a local resident. Visit Nelson Mandela house and share a meal with a local family.', 'Culture', 380.00, 300, 'Soweto, Johannesburg', 6, '["https://images.pexels.com/photos/1559124041/pexels-photo-1559124041.jpeg?auto=compress&cs=tinysrgb&w=800"]', 'Open mind and heart required!', true, NOW())
         ON CONFLICT DO NOTHING
       `);
       
@@ -210,7 +210,7 @@ async function runMigrations() {
         }
         
         // Insert demo reviews
-        const bookings = await pool.query('SELECT id, guest_id, host_id FROM bookings WHERE status = ''confirmed''');
+        const bookings = await pool.query('SELECT id, guest_id, host_id FROM bookings WHERE status = $1', ['confirmed']);
         
         if (bookings.rows.length > 0) {
           await pool.query(`
