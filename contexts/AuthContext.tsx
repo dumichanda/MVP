@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (response.ok) {
         const userData = await response.json();
-        logger.info('User authenticated', { email: userData.user?.email }, 'AuthContext');
+        logger.info(`User authenticated: ${userData.user?.email}`, 'AuthContext');
         setUser(userData.user);
       } else {
         logger.debug('No valid authentication found', undefined, 'AuthContext');
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      logger.info('Attempting sign in', { email }, 'AuthContext');
+      logger.info(`Attempting sign in for: ${email}`, 'AuthContext');
       
       const response = await fetch('/api/auth/signin', {
         method: 'POST',
@@ -72,12 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         const error = await response.json();
-        logger.warn('Sign in failed', { email, error: error.error }, 'AuthContext');
+        logger.warn(`Sign in failed for ${email}: ${error.error}`, 'AuthContext');
         throw new Error(error.error || 'Sign in failed');
       }
 
       const data = await response.json();
-      logger.info('Sign in successful', { email }, 'AuthContext');
+      logger.info(`Sign in successful for: ${email}`, 'AuthContext');
       setUser(data.user);
     } catch (error) {
       logger.error(error instanceof Error ? error : new Error('Sign in error'), 'AuthContext');
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string, phone?: string) => {
     try {
-      logger.info('Attempting sign up', { email }, 'AuthContext');
+      logger.info(`Attempting sign up for: ${email}`, 'AuthContext');
       
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
@@ -100,12 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         const error = await response.json();
-        logger.warn('Sign up failed', { email, error: error.error }, 'AuthContext');
+        logger.warn(`Sign up failed for ${email}: ${error.error}`, 'AuthContext');
         throw new Error(error.error || 'Sign up failed');
       }
 
       const data = await response.json();
-      logger.info('Sign up successful', { email }, 'AuthContext');
+      logger.info(`Sign up successful for: ${email}`, 'AuthContext');
       setUser(data.user);
     } catch (error) {
       logger.error(error instanceof Error ? error : new Error('Sign up error'), 'AuthContext');
