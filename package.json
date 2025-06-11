@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev-with-db-check.js",
+    "next-dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:check": "node scripts/check-database.js",
+    "db:setup": "node scripts/check-database.js",
+    "postinstall": "node scripts/check-database.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",

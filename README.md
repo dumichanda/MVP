@@ -55,41 +55,38 @@ NEXTAUTH_SECRET="your-secret-key-minimum-32-characters"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
-### 4. Set up the database
-Run the schema and seed scripts in your Neon Console:
-
-1. Go to [Neon Console](https://console.neon.tech)
-2. Create a new project (if you haven't already)
-3. Copy your connection string to `.env.local`
-4. In the SQL Editor, run:
-   - `sql/schema.sql` to create all tables
-   - `sql/seed.sql` to add sample data (optional)
-
-### 5. Start the development server
+### 4. Start the development server
 ```bash
 npm run dev
 ```
 
+**🎉 That's it!** The startup script will automatically:
+- ✅ Check your database connection
+- ✅ Create tables if they don't exist
+- ✅ Insert demo data if the database is empty
+- ✅ Start the Next.js development server
+
 Visit [http://localhost:3000](http://localhost:3000) to see your application.
 
-## 🔧 Deployment
+## 🧪 Demo Accounts
 
-### Deploy to Vercel (Recommended)
+The app comes with pre-configured demo accounts:
 
-1. Connect your GitHub repository to Vercel
-2. Configure environment variables in Vercel dashboard:
-   - `DATABASE_URL`
-   - `NEXTAUTH_URL` (your production domain)
-   - `NEXTAUTH_SECRET`
-   - `NEXT_PUBLIC_APP_URL` (your production domain)
-3. Deploy with automatic builds
+| Email | Password | Location |
+|-------|----------|----------|
+| thabo.mthembu@gmail.com | password123 | Cape Town |
+| naledi.williams@outlook.com | password123 | Cape Town |
+| sipho.maharaj@gmail.com | password123 | Johannesburg |
+| nomsa.dlamini@gmail.com | password123 | Soweto |
 
-### Deploy to Other Platforms
+## 🛠️ Available Scripts
 
-The app is configured to work with any Node.js hosting platform. Just ensure you:
-1. Set up the required environment variables
-2. Run `npm run build` to create the production build
-3. Start with `npm start`
+- `npm run dev` - Start development server with automatic database setup
+- `npm run build` - Create production build
+- `npm run start` - Start production server
+- `npm run db:check` - Check database connection and status
+- `npm run db:setup` - Setup database schema and demo data
+- `npm run lint` - Run ESLint
 
 ## 🗂️ Project Structure
 
@@ -98,8 +95,8 @@ The app is configured to work with any Node.js hosting platform. Just ensure you
 │   ├── api/               # API routes
 │   │   ├── auth/          # Authentication endpoints
 │   │   ├── experiences/   # Experience management
-│   │   ├── bookings/      # Booking management
-│   │   └── messages/      # Messaging endpoints
+│   │   ├── messages/      # Messaging endpoints
+│   │   └── profile/       # Profile management
 │   ├── auth/              # Authentication pages
 │   ├── bookings/          # Booking management pages
 │   ├── chats/             # Messaging interface
@@ -112,11 +109,13 @@ The app is configured to work with any Node.js hosting platform. Just ensure you
 ├── hooks/                # Custom React hooks
 ├── lib/                  # Utility functions and API
 │   ├── auth.ts          # Authentication utilities
-│   └── db.ts            # Database connection
+│   ├── db.ts            # Database connection
+│   └── logger.ts        # Logging utility
+├── scripts/              # Database and setup scripts
+│   ├── check-database.js # Database health check
+│   └── dev-with-db-check.js # Development startup script
 ├── sql/                  # Database scripts
-│   ├── schema.sql       # Database schema
-│   └── seed.sql         # Sample data
-├── types/                # TypeScript type definitions
+│   └── schema.sql       # Database schema
 └── middleware.ts         # Next.js middleware for auth
 ```
 
@@ -131,6 +130,7 @@ The app uses a custom JWT-based authentication system with:
 ## 💾 Database
 
 - **PostgreSQL** with Neon DB (serverless)
+- **Automatic setup** on first run
 - **Connection pooling** for performance
 - **Transaction support** for data consistency
 - **Optimized queries** with proper indexing
@@ -149,34 +149,62 @@ Built with modern, accessible components:
 - `POST /api/auth/signin` - User sign in
 - `POST /api/auth/signup` - User registration
 - `POST /api/auth/signout` - User sign out
+- `GET /api/auth/me` - Get current user
 
 ### Experiences
 - `GET /api/experiences` - List experiences with filters
 - `POST /api/experiences` - Create new experience
 - `GET /api/experiences/[id]` - Get experience details
 
-### Bookings
-- `GET /api/bookings` - Get user bookings
-- `POST /api/bookings` - Create new booking
-- `PUT /api/bookings/[id]` - Update booking status
+### Profile
+- `GET /api/profile` - Get user profile
+- `PUT /api/profile` - Update user profile
 
 ### Messages
 - `GET /api/messages/conversations` - Get user conversations
 - `GET /api/messages/[id]` - Get conversation messages
 - `POST /api/messages` - Send message
 
-## 🧪 Test Users
+## 🔧 Troubleshooting
 
-The seed data includes these test users:
-- Email: nomsa@example.com, Password: password123
-- Email: michael@example.com, Password: password123
-- Email: sarah@example.com, Password: password123
+### Database Connection Issues
+If you see database connection errors:
+
+1. **Check your .env.local file**:
+   ```bash
+   cat .env.local
+   ```
+
+2. **Verify your Neon DB connection string**:
+   - Go to [Neon Console](https://console.neon.tech)
+   - Copy the connection string from your dashboard
+   - Make sure it includes the password
+
+3. **Test the connection manually**:
+   ```bash
+   npm run db:check
+   ```
+
+### Build Errors
+If you encounter build errors:
+
+1. **Clear Next.js cache**:
+   ```bash
+   rm -rf .next
+   npm run build
+   ```
+
+2. **Check for TypeScript errors**:
+   ```bash
+   npm run lint
+   ```
 
 ## 🚧 Known Issues Fixed
 
-✅ **Cloudflare:sockets webpack error** - Fixed with proper webpack configuration
-✅ **Database connection issues** - Resolved by using @neondatabase/serverless exclusively
-✅ **Authentication token handling** - Implemented secure HTTP-only cookies
+✅ **Database setup automation** - Now handled automatically on startup
+✅ **Authentication flow** - Secure JWT implementation with HTTP-only cookies
+✅ **API route errors** - All endpoints properly implemented
+✅ **Environment configuration** - Automatic detection and validation
 
 ## 🔮 Future Features
 
@@ -204,9 +232,11 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For support and questions:
 - Create an issue on GitHub
-- Check the documentation
+- Check the troubleshooting section above
 - Contact: [your-email@example.com]
 
 ---
 
 Built with ❤️ using Next.js, TypeScript, and Neon DB
+
+**🎉 Ready to start dating through experiences!**
