@@ -1,4 +1,4 @@
-// middleware.ts - Fixed middleware with proper error handling
+// middleware.ts - Fixed middleware to redirect to correct auth page
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './lib/logger';
 
@@ -25,7 +25,7 @@ const protectedRoutes = [
 ];
 
 // Define auth routes (redirect to dashboard if already authenticated)
-const authRoutes = ['/auth/signin', '/auth/signup', '/auth'];
+const authRoutes = ['/auth'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -49,19 +49,19 @@ export function middleware(request: NextRequest) {
   // Handle protected routes
   if (isProtectedRoute) {
     if (!token) {
-      logger.info('Middleware', `Redirecting to signin - no token for protected route: ${pathname}`);
-      const signInUrl = new URL('/auth/signin', request.url);
-      signInUrl.searchParams.set('from', pathname);
-      return NextResponse.redirect(signInUrl);
+      logger.info('Middleware', `Redirecting to auth - no token for protected route: ${pathname}`);
+      const authUrl = new URL('/auth', request.url);
+      authUrl.searchParams.set('from', pathname);
+      return NextResponse.redirect(authUrl);
     }
 
     // Verify token (simple verification without database)
     const decoded = verifyTokenSimple(token);
     if (!decoded) {
-      logger.warn('Middleware', `Redirecting to signin - invalid token for protected route: ${pathname}`);
-      const signInUrl = new URL('/auth/signin', request.url);
-      signInUrl.searchParams.set('from', pathname);
-      const response = NextResponse.redirect(signInUrl);
+      logger.warn('Middleware', `Redirecting to auth - invalid token for protected route: ${pathname}`);
+      const authUrl = new URL('/auth', request.url);
+      authUrl.searchParams.set('from', pathname);
+      const response = NextResponse.redirect(authUrl);
       
       // Clear invalid token
       response.cookies.set('auth-token', '', {
