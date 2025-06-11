@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// scripts/check-database.js - Database health check and setup with correct schema handling
+// scripts/check-database.js - Database health check with proper schema detection
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -20,6 +20,50 @@ function loadEnv() {
     }
   } catch (error) {
     console.log('⚠️  Could not load .env.local file');
+  }
+}
+
+async function checkTableExists(pool, tableName) {
+  try {
+    const result = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = $1
+      );
+    `, [tableName]);
+    return result.rows[0].exists;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function checkColumnExists(pool, tableName, columnName) {
+  try {
+    const result = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = $1 
+        AND column_name = $2
+      );
+    `, [tableName, columnName]);
+    return result.rows[0].exists;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function getTableCount(pool, tableName) {
+  try {
+    const exists = await checkTableExists(pool, tableName);
+    if (!exists) {
+      return 0;
+    }
+    const result = await pool.query(`SELECT COUNT(*) FROM ${tableName}`);
+    return parseInt(result.rows[0].count);
+  } catch (error) {
+    return 0;
   }
 }
 
@@ -49,87 +93,39 @@ async function checkDatabaseConnection() {
     
     console.log('✅ Database connection successful');
     
-    // Check if users table exists
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'users'
-      );
-    `);
+    // Check table existence
+    const usersExists = await checkTableExists(pool, 'users');
+    const experiencesExists = await checkTableExists(pool, 'experiences');
+    const bookingsExists = await checkTableExists(pool, 'bookings');
+    const conversationsExists = await checkTableExists(pool, 'conversations');
+    const messagesExists = await checkTableExists(pool, 'messages');
     
-    const tablesExist = tableCheck.rows[0].exists;
-    
-    if (!tablesExist) {
-      console.log('⚠️  Database tables not found');
-      return { connected: true, tablesExist: false };
-    }
-    
-    // Check if we have demo data
-    const userCount = await pool.query('SELECT COUNT(*) FROM users');
-    const experienceCount = await pool.query('SELECT COUNT(*) FROM experiences');
-    
-    // Check other tables safely
-    let bookingCount = { rows: [{ count: 0 }] };
-    let conversationCount = { rows: [{ count: 0 }] };
-    let messageCount = { rows: [{ count: 0 }] };
-    
-    try {
-      // Check if bookings table exists
-      const bookingsTableExists = await pool.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = 'bookings'
-        );
-      `);
-      
-      if (bookingsTableExists.rows[0].exists) {
-        bookingCount = await pool.query('SELECT COUNT(*) FROM bookings');
-      }
-      
-      // Check if conversations table exists
-      const conversationsTableExists = await pool.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = 'conversations'
-        );
-      `);
-      
-      if (conversationsTableExists.rows[0].exists) {
-        conversationCount = await pool.query('SELECT COUNT(*) FROM conversations');
-      }
-      
-      // Check if messages table exists
-      const messagesTableExists = await pool.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = 'messages'
-        );
-      `);
-      
-      if (messagesTableExists.rows[0].exists) {
-        messageCount = await pool.query('SELECT COUNT(*) FROM messages');
-      }
-      
-    } catch (error) {
-      console.log('ℹ️  Some tables don\'t exist yet, will be created');
-    }
+    // Get counts safely
+    const userCount = await getTableCount(pool, 'users');
+    const experienceCount = await getTableCount(pool, 'experiences');
+    const bookingCount = await getTableCount(pool, 'bookings');
+    const conversationCount = await getTableCount(pool, 'conversations');
+    const messageCount = await getTableCount(pool, 'messages');
     
     console.log(`📊 Database status:`);
-    console.log(`   Users: ${userCount.rows[0].count}`);
-    console.log(`   Experiences: ${experienceCount.rows[0].count}`);
-    console.log(`   Bookings: ${bookingCount.rows[0].count}`);
-    console.log(`   Conversations: ${conversationCount.rows[0].count}`);
-    console.log(`   Messages: ${messageCount.rows[0].count}`);
+    console.log(`   Users: ${userCount}`);
+    console.log(`   Experiences: ${experienceCount}`);
+    console.log(`   Bookings: ${bookingCount}`);
+    console.log(`   Conversations: ${conversationCount}`);
+    console.log(`   Messages: ${messageCount}`);
     
     return { 
       connected: true, 
-      tablesExist: true, 
-      hasData: parseInt(userCount.rows[0].count) > 0,
-      hasCompleteData: parseInt(bookingCount.rows[0].count) > 0 && parseInt(conversationCount.rows[0].count) > 0
+      tablesExist: usersExists && experiencesExists,
+      hasData: userCount > 0,
+      hasCompleteData: bookingCount > 0 && conversationCount > 0,
+      tableStatus: {
+        users: usersExists,
+        experiences: experiencesExists,
+        bookings: bookingsExists,
+        conversations: conversationsExists,
+        messages: messagesExists
+      }
     };
     
   } catch (error) {
@@ -152,7 +148,26 @@ async function createSchemaOnly() {
   try {
     console.log('🔨 Creating database schema safely...');
     
-    // Create schema without triggers first - using the EXACT schema from sql/schema.sql
+    // First, check if we need to drop and recreate conversations table
+    const conversationsExists = await checkTableExists(pool, 'conversations');
+    
+    if (conversationsExists) {
+      // Check if it has the correct structure
+      const hasParticipant1 = await checkColumnExists(pool, 'conversations', 'participant_1');
+      const hasParticipant2 = await checkColumnExists(pool, 'conversations', 'participant_2');
+      
+      if (!hasParticipant1 || !hasParticipant2) {
+        console.log('🔄 Updating conversations table structure...');
+        
+        // Drop dependent tables first
+        await pool.query('DROP TABLE IF EXISTS messages CASCADE');
+        await pool.query('DROP TABLE IF EXISTS conversations CASCADE');
+        
+        console.log('✅ Old conversation structure removed');
+      }
+    }
+    
+    // Create the complete schema
     const safeSchema = `
       -- Enable UUID extension
       CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -291,33 +306,26 @@ async function createSchemaOnly() {
         $$ language 'plpgsql';
       `);
       
-      // Check and create triggers one by one
-      const triggers = [
-        { table: 'users', trigger: 'update_users_updated_at' },
-        { table: 'experiences', trigger: 'update_experiences_updated_at' },
-        { table: 'bookings', trigger: 'update_bookings_updated_at' }
-      ];
+      // Drop and recreate triggers to avoid conflicts
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+        DROP TRIGGER IF EXISTS update_experiences_updated_at ON experiences;
+        DROP TRIGGER IF EXISTS update_bookings_updated_at ON bookings;
+      `);
       
-      for (const { table, trigger } of triggers) {
-        // Check if trigger exists
-        const triggerExists = await pool.query(`
-          SELECT EXISTS (
-            SELECT 1 FROM information_schema.triggers 
-            WHERE trigger_name = $1 AND event_object_table = $2
-          );
-        `, [trigger, table]);
-        
-        if (!triggerExists.rows[0].exists) {
-          await pool.query(`
-            CREATE TRIGGER ${trigger}
-                BEFORE UPDATE ON ${table}
-                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-          `);
-          console.log(`✅ Created trigger: ${trigger}`);
-        } else {
-          console.log(`ℹ️  Trigger already exists: ${trigger}`);
-        }
-      }
+      await pool.query(`
+        CREATE TRIGGER update_users_updated_at
+            BEFORE UPDATE ON users
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+            
+        CREATE TRIGGER update_experiences_updated_at
+            BEFORE UPDATE ON experiences
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+            
+        CREATE TRIGGER update_bookings_updated_at
+            BEFORE UPDATE ON bookings
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      `);
       
       console.log('✅ Triggers setup completed');
       
@@ -352,9 +360,9 @@ async function runMigrations() {
     await createSchemaOnly();
     
     // Check if we need to run seed data
-    const userCount = await pool.query('SELECT COUNT(*) FROM users');
+    const userCount = await getTableCount(pool, 'users');
     
-    if (parseInt(userCount.rows[0].count) === 0) {
+    if (userCount === 0) {
       console.log('🌱 No users found, inserting demo data...');
       
       // Insert demo users with hashed passwords
@@ -384,9 +392,9 @@ async function runMigrations() {
     }
     
     // Check if we need to add additional demo data (bookings, conversations, messages)
-    const bookingCount = await pool.query('SELECT COUNT(*) FROM bookings');
+    const bookingCount = await getTableCount(pool, 'bookings');
     
-    if (parseInt(bookingCount.rows[0].count) === 0) {
+    if (bookingCount === 0) {
       console.log('🔗 Adding demo bookings, conversations, and messages...');
       
       // Get user IDs
@@ -455,19 +463,19 @@ async function runMigrations() {
       }
     }
     
-    const finalUserCount = await pool.query('SELECT COUNT(*) FROM users');
-    const finalExperienceCount = await pool.query('SELECT COUNT(*) FROM experiences');
-    const finalBookingCount = await pool.query('SELECT COUNT(*) FROM bookings');
-    const finalConversationCount = await pool.query('SELECT COUNT(*) FROM conversations');
-    const finalMessageCount = await pool.query('SELECT COUNT(*) FROM messages');
+    const finalUserCount = await getTableCount(pool, 'users');
+    const finalExperienceCount = await getTableCount(pool, 'experiences');
+    const finalBookingCount = await getTableCount(pool, 'bookings');
+    const finalConversationCount = await getTableCount(pool, 'conversations');
+    const finalMessageCount = await getTableCount(pool, 'messages');
     
     console.log('🎉 Database setup completed!');
     console.log(`📊 Final counts:`);
-    console.log(`   Users: ${finalUserCount.rows[0].count}`);
-    console.log(`   Experiences: ${finalExperienceCount.rows[0].count}`);
-    console.log(`   Bookings: ${finalBookingCount.rows[0].count}`);
-    console.log(`   Conversations: ${finalConversationCount.rows[0].count}`);
-    console.log(`   Messages: ${finalMessageCount.rows[0].count}`);
+    console.log(`   Users: ${finalUserCount}`);
+    console.log(`   Experiences: ${finalExperienceCount}`);
+    console.log(`   Bookings: ${finalBookingCount}`);
+    console.log(`   Conversations: ${finalConversationCount}`);
+    console.log(`   Messages: ${finalMessageCount}`);
     
     return true;
     
