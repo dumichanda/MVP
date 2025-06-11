@@ -1,6 +1,5 @@
-// middleware.ts - Fixed middleware to redirect to correct auth page
+// middleware.ts - Fixed middleware with proper logger calls
 import { NextRequest, NextResponse } from 'next/server';
-import { logger } from './lib/logger';
 
 // Simple token verification without database dependency
 function verifyTokenSimple(token: string): { userId: string } | null {
@@ -31,10 +30,8 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth-token')?.value;
 
-  logger.info('Middleware', `Request to ${pathname}`, {
-    hasToken: !!token,
-    userAgent: request.headers.get('user-agent')?.substring(0, 50)
-  });
+  // Simple console logging instead of complex logger
+  console.log(`[Middleware] Request to ${pathname} - Token: ${!!token}`);
 
   // Check if the current path is protected
   const isProtectedRoute = protectedRoutes.some(route => 
@@ -49,7 +46,7 @@ export function middleware(request: NextRequest) {
   // Handle protected routes
   if (isProtectedRoute) {
     if (!token) {
-      logger.info('Middleware', `Redirecting to auth - no token for protected route: ${pathname}`);
+      console.log(`[Middleware] Redirecting to auth - no token for protected route: ${pathname}`);
       const authUrl = new URL('/auth', request.url);
       authUrl.searchParams.set('from', pathname);
       return NextResponse.redirect(authUrl);
@@ -58,7 +55,7 @@ export function middleware(request: NextRequest) {
     // Verify token (simple verification without database)
     const decoded = verifyTokenSimple(token);
     if (!decoded) {
-      logger.warn('Middleware', `Redirecting to auth - invalid token for protected route: ${pathname}`);
+      console.log(`[Middleware] Redirecting to auth - invalid token for protected route: ${pathname}`);
       const authUrl = new URL('/auth', request.url);
       authUrl.searchParams.set('from', pathname);
       const response = NextResponse.redirect(authUrl);
@@ -74,20 +71,20 @@ export function middleware(request: NextRequest) {
       return response;
     }
 
-    logger.debug('Middleware', `Access granted to protected route: ${pathname}`);
+    console.log(`[Middleware] Access granted to protected route: ${pathname}`);
   }
 
   // Handle auth routes (redirect if already authenticated)
   if (isAuthRoute && token) {
     const decoded = verifyTokenSimple(token);
     if (decoded) {
-      logger.info('Middleware', `Redirecting authenticated user from auth route: ${pathname}`);
+      console.log(`[Middleware] Redirecting authenticated user from auth route: ${pathname}`);
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
 
   // Allow the request to proceed
-  logger.debug('Middleware', `Request allowed to proceed: ${pathname}`);
+  console.log(`[Middleware] Request allowed to proceed: ${pathname}`);
   return NextResponse.next();
 }
 
