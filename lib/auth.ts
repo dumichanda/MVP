@@ -1,4 +1,3 @@
-// lib/auth.ts - Fixed authentication using Neon DB
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query, getUser, createUser } from './db';

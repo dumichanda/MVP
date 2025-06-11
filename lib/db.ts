@@ -1,4 +1,3 @@
-// lib/db.ts - Fixed version for Neon DB (NO pg imports)
 import { Pool, neonConfig } from '@neondatabase/serverless';
 
 // Configure Neon for serverless environments
