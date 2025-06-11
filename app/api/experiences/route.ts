@@ -62,16 +62,14 @@ export async function GET(request: NextRequest) {
     logger.debug('Executing experiences query', { queryText }, 'API:experiences');
     const result = await query(queryText, queryParams);
 
-    logger.info('Experiences fetched successfully', { 
-      count: result.rows.length 
-    }, 'API:experiences');
+    logger.info(`Experiences fetched successfully - count: ${result.rows.length}`, 'API:experiences');
 
     return NextResponse.json({
       success: true,
       experiences: result.rows,
     });
   } catch (error) {
-    logger.error('Failed to fetch experiences', 'API:experiences');
+    logger.error(error, 'API:experiences - Failed to fetch experiences');
     handleApiError(error, 'GET /api/experiences');
     return NextResponse.json(
       { error: 'Failed to fetch experiences' },
@@ -124,10 +122,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!title || !description || !category || !price || !duration || !location) {
-      logger.warn('Missing required fields', { 
-        title: !!title, description: !!description, category: !!category, 
-        price: !!price, duration: !!duration, location: !!location 
-      }, 'API:experiences');
+      logger.warn('Missing required fields', 'API:experiences');
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -135,7 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create experience
-    logger.debug('Inserting experience into database', undefined, 'API:experiences');
+    logger.debug('Inserting experience into database', 'API:experiences');
     const result = await query(
       `INSERT INTO experiences (
         host_id, title, description, category, price, duration,
@@ -155,16 +150,14 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    logger.info('Experience created successfully', { 
-      experienceId: result.rows[0].id 
-    }, 'API:experiences');
+    logger.info(`Experience created successfully - ID: ${result.rows[0].id}`, 'API:experiences');
 
     return NextResponse.json({
       success: true,
       experience: result.rows[0],
     });
   } catch (error) {
-    logger.error('Failed to create experience', 'API:experiences');
+    logger.error(error, 'API:experiences - Failed to create experience');
     handleApiError(error, 'POST /api/experiences');
     return NextResponse.json(
       { error: 'Failed to create experience' },
