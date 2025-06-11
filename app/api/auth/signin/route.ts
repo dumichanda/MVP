@@ -23,14 +23,14 @@ export async function POST(request: NextRequest) {
     const result = await signIn(email, password);
 
     if (!result.success) {
-      logger.warn('Sign in failed', { email, error: result.error }, 'API:auth/signin');
+      logger.warn(`Sign in failed for ${email}: ${result.error}`, 'API:auth/signin');
       return NextResponse.json(
         { error: result.error },
         { status: 401 }
       );
     }
 
-    logger.info('Sign in successful', { email }, 'API:auth/signin');
+    logger.info(`Sign in successful for ${email}`, 'API:auth/signin');
 
     // Create response with token in HTTP-only cookie
     const response = NextResponse.json({
