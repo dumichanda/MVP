@@ -41,6 +41,24 @@ export default function SignInPage() {
     }
   };
 
+  const handleDemoLogin = async (email: string) => {
+    setLoginData({ email, password: 'password123' });
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      await signIn(email, 'password123');
+      
+      // Redirect to the page they were trying to access, or home
+      const from = searchParams.get('from') || '/';
+      router.push(from);
+    } catch (err: any) {
+      setError(err.message || 'Demo login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -150,10 +168,38 @@ export default function SignInPage() {
               </div>
 
               {/* Demo Credentials */}
-              <div className="mt-4 p-3 bg-blue-900/20 border border-blue-700 rounded-lg">
-                <p className="text-blue-400 text-sm font-medium mb-2">Demo Credentials:</p>
-                <p className="text-blue-300 text-xs">Email: nomsa@example.com</p>
-                <p className="text-blue-300 text-xs">Password: password123</p>
+              <div className="mt-4 p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
+                <p className="text-blue-400 text-sm font-medium mb-3">Demo Accounts (Click to login):</p>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('thabo.mthembu@gmail.com')}
+                    disabled={isLoading}
+                    className="w-full text-left p-2 bg-blue-800/30 hover:bg-blue-800/50 rounded text-blue-300 text-xs transition-colors disabled:opacity-50"
+                  >
+                    <div className="font-medium">Thabo Mthembu (Cape Town)</div>
+                    <div className="text-blue-400">thabo.mthembu@gmail.com</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('naledi.williams@outlook.com')}
+                    disabled={isLoading}
+                    className="w-full text-left p-2 bg-blue-800/30 hover:bg-blue-800/50 rounded text-blue-300 text-xs transition-colors disabled:opacity-50"
+                  >
+                    <div className="font-medium">Naledi Williams (Cape Town)</div>
+                    <div className="text-blue-400">naledi.williams@outlook.com</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('sipho.maharaj@gmail.com')}
+                    disabled={isLoading}
+                    className="w-full text-left p-2 bg-blue-800/30 hover:bg-blue-800/50 rounded text-blue-300 text-xs transition-colors disabled:opacity-50"
+                  >
+                    <div className="font-medium">Sipho Maharaj (Johannesburg)</div>
+                    <div className="text-blue-400">sipho.maharaj@gmail.com</div>
+                  </button>
+                </div>
+                <p className="text-blue-300 text-xs mt-2 text-center">All demo accounts use password: password123</p>
               </div>
             </CardContent>
           </Card>
